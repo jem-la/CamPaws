@@ -25,7 +25,7 @@ class DogCatalogTest {
         DogCatalog catalog = new DogCatalog();
         catalog.createDogProfile(
                 makeDog(1, "Luna", "Golden Retriever",
-                        true, 37.3496f, -121.9390f)
+                        true, 30f, 30f)
         );
 
         assertEquals(1, catalog.getDogCount());
@@ -36,7 +36,7 @@ class DogCatalogTest {
         DogCatalog catalog = new DogCatalog();
         catalog.createDogProfile(
                 makeDog(1, "Luna", "Golden Retriever",
-                        true, 37.3496f, -121.9390f)
+                        true, 30f, 30f)
         );
         List<DogProfile> results = catalog.searchByName("lUnA");
 
@@ -49,7 +49,7 @@ class DogCatalogTest {
         DogCatalog catalog = new DogCatalog();
         catalog.createDogProfile(
                 makeDog(1, "Luna", "Golden Retriever",
-                        true, 37.3496f, -121.9390f)
+                        true, 30f, 30f)
         );
 
         assertEquals(1, catalog.searchByName("Luna").size());
@@ -61,11 +61,11 @@ class DogCatalogTest {
         DogCatalog catalog = new DogCatalog();
         catalog.createDogProfile(
                 makeDog(1, "Luna", "Golden Retriever",
-                        true, 37.3496f, -121.9390f)
+                        true, 30f, 30f)
         );
         catalog.createDogProfile(
                 makeDog(2, "Max", "Beagle",
-                        false, 37.3496f, -121.9390f)
+                        false, 30f, 30f)
         );
         List<DogProfile> results =
                 catalog.filterByAttributes("Golden Retriever", true);
@@ -79,15 +79,15 @@ class DogCatalogTest {
         DogCatalog catalog = new DogCatalog();
         catalog.createDogProfile(
                 makeDog(1, "Nearby Dog", "Beagle",
-                        true, 37.3496f, -121.9390f)
+                        true, 30f, -30f)
         );
         catalog.createDogProfile(
                 makeDog(2, "Far Dog", "Beagle",
-                        true, 38.0000f, -122.0000f)
+                        true, 30f, 30f)
         );
 
         List<DogProfile> results =
-                catalog.findNearbyDogs(37.3496f, -121.9390f);
+                catalog.findNearbyDogs(30f, 30f);
 
         assertEquals(1, results.size());
         assertEquals("Nearby Dog", results.get(0).getName());
@@ -98,11 +98,11 @@ class DogCatalogTest {
         DogCatalog catalog = new DogCatalog();
         DogProfile luna = makeDog(
                 1, "Luna", "Golden Retriever",
-                true, 37.3496f, -121.9390f
+                true, 30f, 30f
         );
         DogProfile max = makeDog(
                 2, "Max", "Beagle",
-                true, 37.3496f, -121.9390f
+                true, 30f, 30f
         );
 
         luna.addLike();
@@ -117,5 +117,20 @@ class DogCatalogTest {
         assertEquals(2, results.size());
         assertEquals("Max", results.get(0).getName());
         assertEquals("Luna", results.get(1).getName());
+    }
+
+    @Test
+    void testCreateLargeNumberOfDogProfiles() {
+        DogCatalog catalog = new DogCatalog();
+        for (int i = 1; i <= 1000; i++) {
+            catalog.createDogProfile(
+                    makeDog(
+                            i, "Dog" + i, "Mixed Breed",
+                            true, 30f, 30f
+                    )
+            );
+        }
+
+        assertEquals(1000, catalog.getDogCount());
     }
 }

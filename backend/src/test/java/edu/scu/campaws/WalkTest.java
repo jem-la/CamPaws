@@ -73,6 +73,18 @@ class WalkTest {
     }
 
     @Test
+    void testZeroDurationWalk() {
+        Walk walk = new Walk(1);
+        LocalDateTime time = LocalDateTime.of(
+                2026, 10, 24, 10, 0
+        );
+        walk.startWalk(time);
+        walk.endWalk(time);
+
+        assertEquals(0, walk.getDurationMinutes());
+    }
+
+    @Test
     void testCannotStartWalkTwice() {
         Walk walk = new Walk(1);
         LocalDateTime start = LocalDateTime.of(

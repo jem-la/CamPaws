@@ -23,7 +23,7 @@ class DogProfileTest {
         DogProfile dog = new DogProfile(
                 1, "Luna", "Golden Retriever",
                 "Friendly", true, "Daily",
-                37.3496f, -121.9390f
+                30f, 30f
         );
 
         assertTrue(dog.viewDetails().contains("Luna"));
@@ -35,7 +35,7 @@ class DogProfileTest {
         DogProfile dog = new DogProfile(
                 1, "Luna", "Golden Retriever",
                 "Friendly", true, "Daily",
-                37.3496f, -121.9390f
+                30f, 30f
         );
         dog.inputDetails(
                 "Luna", "Golden Retriever",
@@ -52,7 +52,7 @@ class DogProfileTest {
         DogProfile dog = new DogProfile(
                 1, "Luna", "Golden Retriever",
                 "Friendly", true, "Daily",
-                37.3496f, -121.9390f
+                30f, 30f
         );
         dog.addLike();
         dog.addLike();
@@ -66,7 +66,7 @@ class DogProfileTest {
                 new DogProfile(
                         0, "Luna", "Golden Retriever",
                         "Friendly", true, "Daily",
-                        37.3496f, -121.9390f
+                        30f, 30f
                 )
         );
     }
@@ -77,7 +77,7 @@ class DogProfileTest {
                 new DogProfile(
                         1, " ", "Golden Retriever",
                         "Friendly", true, "Daily",
-                        37.3496f, -121.9390f
+                        30f, 30f
                 )
         );
     }
