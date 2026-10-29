@@ -1,5 +1,6 @@
 package edu.scu.campaws;
 
+import edu.scu.campaws.domain.Walk;
 import org.junit.jupiter.api.Test;
 import java.time.LocalDateTime;
 import static org.junit.jupiter.api.Assertions.*;

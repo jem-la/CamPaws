@@ -1,5 +1,6 @@
 package edu.scu.campaws;
 
+import edu.scu.campaws.domain.User;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

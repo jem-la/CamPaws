@@ -1,5 +1,7 @@
 package edu.scu.campaws;
 
+import edu.scu.campaws.service.DogCatalog;
+import edu.scu.campaws.domain.DogProfile;
 import org.junit.jupiter.api.Test;
 import java.util.List;
 import static org.junit.jupiter.api.Assertions.*;
@@ -77,18 +79,15 @@ class DogCatalogTest {
     @Test
     void testFindNearbyDogs() {
         DogCatalog catalog = new DogCatalog();
-        catalog.createDogProfile(
-                makeDog(1, "Nearby Dog", "Beagle",
-                        true, 30f, -30f)
+        catalog.createDogProfile(makeDog(
+                1, "Nearby Dog", "Beagle",
+                true, 37.3496f, -121.9390f)
         );
-        catalog.createDogProfile(
-                makeDog(2, "Far Dog", "Beagle",
-                        true, 30f, 30f)
+        catalog.createDogProfile(makeDog(
+                2, "Far Dog", "Beagle",
+                true, 38.0f, -122.0f)
         );
-
-        List<DogProfile> results =
-                catalog.findNearbyDogs(30f, 30f);
-
+        List<DogProfile> results = catalog.findNearbyDogs(37.3496f, -121.9390f);
         assertEquals(1, results.size());
         assertEquals("Nearby Dog", results.get(0).getName());
     }
