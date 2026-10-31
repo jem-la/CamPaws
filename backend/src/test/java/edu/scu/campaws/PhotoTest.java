@@ -1,68 +1,70 @@
 package edu.scu.campaws;
 
 import edu.scu.campaws.domain.Photo;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class PhotoTest {
     @Test
-    void testCreatePhoto() {
+    void createPhotoStartsWithoutUrl() {
         Photo photo = new Photo(1);
-
         assertEquals(1, photo.getPhotoId());
         assertNull(photo.getImageUrl());
     }
 
     @Test
-    void testUploadPhoto() {
+    void uploadHttpsUrl() {
         Photo photo = new Photo(1);
-        photo.uploadPhoto("https://example.com/luna.jpg");
-
-        assertEquals(
-                "https://example.com/luna.jpg",
-                photo.getImageUrl()
-        );
+        photo.uploadPhoto("https://example.com/dog.jpg");
+        assertEquals("https://example.com/dog.jpg", photo.getImageUrl());
     }
 
     @Test
-    void testUploadPhotoWithWhitespace() {
+    void uploadTrimsWhitespace() {
         Photo photo = new Photo(1);
-        photo.uploadPhoto("  https://example.com/luna.jpg  ");
-
-        assertEquals(
-                "https://example.com/luna.jpg",
-                photo.getImageUrl()
-        );
+        photo.uploadPhoto("  https://example.com/dog.jpg  ");
+        assertEquals("https://example.com/dog.jpg", photo.getImageUrl());
     }
 
     @Test
-    void testRejectsNullImageUrl() {
+    void rejectsNullUrl() {
         Photo photo = new Photo(1);
-
-        assertThrows(IllegalArgumentException.class, () ->
-                photo.uploadPhoto(null)
-        );
+        assertThrows(IllegalArgumentException.class,
+                () -> photo.uploadPhoto(null));
     }
 
     @Test
-    void testRejectsBlankImageUrl() {
+    void rejectsBlankUrl() {
         Photo photo = new Photo(1);
-
-        assertThrows(IllegalArgumentException.class, () ->
-                photo.uploadPhoto("   ")
-        );
+        assertThrows(IllegalArgumentException.class,
+                () -> photo.uploadPhoto("   "));
     }
 
     @Test
-    void testUploadPhotoReplacesPreviousUrl() {
+    void rejectsEmptyUrl() {
         Photo photo = new Photo(1);
+        assertThrows(IllegalArgumentException.class,
+                () -> photo.uploadPhoto(""));
+    }
 
+    @Test
+    void rejectsFileScheme() {
+        Photo photo = new Photo(1);
+        assertThrows(IllegalArgumentException.class,
+                () -> photo.uploadPhoto("file:///tmp/dog.jpg"));
+    }
+
+    @Test
+    void replacesUrl() {
+        Photo photo = new Photo(1);
         photo.uploadPhoto("https://example.com/old.jpg");
         photo.uploadPhoto("https://example.com/new.jpg");
+        assertEquals("https://example.com/new.jpg", photo.getImageUrl());
+    }
 
-        assertEquals(
-                "https://example.com/new.jpg",
-                photo.getImageUrl()
-        );
+    @Test
+    void rejectsNonPositiveId() {
+        assertThrows(IllegalArgumentException.class, () -> new Photo(0));
     }
 }

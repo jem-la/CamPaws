@@ -1,44 +1,63 @@
 package edu.scu.campaws;
 
 import edu.scu.campaws.domain.User;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 class UserTest {
     @Test
-    void testCreateUser() {
-        User user = new User("jerry", "jerry@scu.edu");
-
-        assertNotNull(user);
+    void createUser() {
+        assertNotNull(new User("jerry", "jerry@scu.edu"));
     }
 
     @Test
-    void testGetUsername() {
-        User user = new User("jerry", "jerry@scu.edu");
-
-        assertEquals("jerry", user.getUsername());
+    void getUsername() {
+        assertEquals("jerry", new User("jerry", "jerry@scu.edu").getUsername());
     }
 
     @Test
-    void testGetEmail() {
-        User user = new User("jerry", "jerry@scu.edu");
-
-        assertEquals("jerry@scu.edu", user.getEmail());
+    void getEmail() {
+        assertEquals("jerry@scu.edu", new User("jerry", "jerry@scu.edu").getEmail());
     }
 
     @Test
-    void testSetUsername() {
+    void setUsername() {
         User user = new User("jerry", "jerry@scu.edu");
-        user.setUsername("patrick");
-
-        assertEquals("patrick", user.getUsername());
+        user.setUsername("alex");
+        assertEquals("alex", user.getUsername());
     }
 
     @Test
-    void testSetEmail() {
+    void setEmail() {
         User user = new User("jerry", "jerry@scu.edu");
-        user.setEmail("patrick@scu.edu");
+        user.setEmail("alex@scu.edu");
+        assertEquals("alex@scu.edu", user.getEmail());
+    }
 
-        assertEquals("patrick@scu.edu", user.getEmail());
+    @Test
+    void rejectsBlankUsername() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new User("  ", "a@scu.edu"));
+    }
+
+    @Test
+    void rejectsMalformedEmail() {
+        assertThrows(IllegalArgumentException.class,
+                () -> new User("alex", "not-an-email"));
+    }
+
+    @Test
+    void friendIdsAreUnique() {
+        User user = new User("alex", "a@scu.edu");
+        user.addFriend(2);
+        user.addFriend(2);
+        assertEquals(1, user.getFriendUserIds().size());
+    }
+
+    @Test
+    void rejectsNonPositiveFriendId() {
+        User user = new User("alex", "a@scu.edu");
+        assertThrows(IllegalArgumentException.class, () -> user.addFriend(0));
     }
 }
