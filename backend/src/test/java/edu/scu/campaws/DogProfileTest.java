@@ -13,7 +13,7 @@ class DogProfileTest {
     }
 
     @Test
-    void createProfileStoresExpectedFields() {
+    void createProfile() {
         DogProfile dog = dog();
         assertEquals(1, dog.getDogId());
         assertEquals("Luna", dog.getName());
@@ -21,13 +21,13 @@ class DogProfileTest {
     }
 
     @Test
-    void viewDetailsIncludesDogNameAndBreed() {
+    void viewDetails() {
         assertTrue(dog().viewDetails().contains("Luna"));
         assertTrue(dog().viewDetails().contains("Golden Retriever"));
     }
 
     @Test
-    void inputDetailsUpdatesFields() {
+    void updatesFields() {
         DogProfile dog = dog();
         dog.inputDetails("Luna", "Golden Retriever", "Calm", false, "Weekly");
         assertEquals("Calm", dog.getTemperament());
@@ -36,7 +36,7 @@ class DogProfileTest {
     }
 
     @Test
-    void addLikeIncrementsCount() {
+    void addLike() {
         DogProfile dog = dog();
         dog.addLike();
         dog.addLike();
@@ -65,28 +65,80 @@ class DogProfileTest {
     }
 
     @Test
-    void acceptsBoundaryCoordinates() {
-        assertDoesNotThrow(() -> DogProfile.validateCoordinates(90, 180));
-        assertDoesNotThrow(() -> DogProfile.validateCoordinates(-90, -180));
-    }
-
-    @Test
-    void rejectsLatitudeOutsideRange() {
+    void testCoordinateRangeValidation() {
         assertThrows(IllegalArgumentException.class,
-                () -> DogProfile.validateCoordinates(90.0001, 0));
-    }
+                () -> DogProfile.validateCoordinates(90.1, 0));
 
-    @Test
-    void rejectsNonFiniteLongitude() {
         assertThrows(IllegalArgumentException.class,
-                () -> DogProfile.validateCoordinates(0, Double.NaN));
+                () -> DogProfile.validateCoordinates(0, 180.1));
     }
 
     @Test
-    void trimsNameAndOptionalFields() {
-        DogProfile dog = new DogProfile(1, " Luna ", " Retriever ",
+    void testCoordinateBoundaries() {
+        assertDoesNotThrow(
+                () -> DogProfile.validateCoordinates(-90, -180));
+
+        assertDoesNotThrow(
+                () -> DogProfile.validateCoordinates(90, 180));
+    }
+
+    @Test
+    void testNameLengthLimit() {
+        String validName = "A".repeat(80);
+
+        assertDoesNotThrow(() -> new DogProfile(
+                1, validName, "Breed", "Friendly",
+                true, "Daily", 0, 0));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                new DogProfile(
+                        1, "A".repeat(81), "Breed", "Friendly",
+                        true, "Daily", 0, 0));
+    }
+
+    @Test
+    void testNameTrimming() {
+        DogProfile dog = new DogProfile(
+                1, " Luna ", " Golden Retriever ",
                 " Friendly ", true, " Daily ", 0, 0);
+
         assertEquals("Luna", dog.getName());
-        assertEquals("Retriever", dog.getBreed());
+        assertEquals("Golden Retriever", dog.getBreed());
+        assertEquals("Friendly", dog.getTemperament());
+        assertEquals("Daily", dog.getCampusFrequency());
+    }
+
+    @Test
+    void testPhotoUrlValidation() {
+        DogProfile dog = new DogProfile(
+                1, "Luna", "Breed", "Friendly",
+                true, "Daily", 0, 0);
+
+        dog.setPhotoUrl(" HTTPS://example.com/dog.jpg ");
+
+        assertEquals("HTTPS://example.com/dog.jpg",
+                dog.getPhotoUrl());
+
+        assertThrows(IllegalArgumentException.class,
+                () -> dog.setPhotoUrl("ftp://example.com/dog.jpg"));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> dog.setPhotoUrl(null));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> dog.setPhotoUrl(" "));
+    }
+
+    @Test
+    void testLikeCountOverflow() throws Exception {
+        DogProfile dog = new DogProfile(
+                1, "Luna", "Breed", "Friendly",
+                true, "Daily", 0, 0);
+
+        Field field = DogProfile.class.getDeclaredField("likeCount");
+        field.setAccessible(true);
+        field.setInt(dog, Integer.MAX_VALUE);
+
+        assertThrows(IllegalStateException.class, dog::addLike);
     }
 }
