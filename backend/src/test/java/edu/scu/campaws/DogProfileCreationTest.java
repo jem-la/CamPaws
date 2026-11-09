@@ -1,7 +1,6 @@
 package edu.scu.campaws;
 
 import edu.scu.campaws.domain.DogProfile;
-import edu.scu.campaws.service.DogCatalog;
 import edu.scu.campaws.service.PhotoStorage;
 
 import org.junit.jupiter.api.Test;
@@ -15,10 +14,10 @@ import java.util.NoSuchElementException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** Covers the "create a dog profile" use case: appearance fields, photos and duplicates. */
+/** Covers the "create a dog profile" use case: appearance fields and photos (duplicates: DogCatalogTest). */
 class DogProfileCreationTest {
     private DogProfile dog() {
-        return new DogProfile(1, "Mochi", null, "Friendly", false, "Most weekdays", 0f, 0f);
+        return new DogProfile(1, "Mochi", "Friendly", false, "Most weekdays", 0f, 0f);
     }
 
     @Test
@@ -62,21 +61,6 @@ class DogProfileCreationTest {
                 List.of("https://a", "https://b", "https://c", "https://d", "https://e", "https://f")));
         assertThrows(IllegalArgumentException.class,
                 () -> dog.setPhotoUrls(List.of("https://ok.test/a.jpg", "file:///local.jpg")));
-    }
-
-    @Test
-    void findsDuplicatesByNameAndCompatibleFurColor() {
-        DogCatalog catalog = new DogCatalog();
-        DogProfile mochi = catalog.createDogProfile("Mochi", null, null, false, null);
-        mochi.inputAppearance("Tan and white", null, null, null);
-        DogProfile other = catalog.createDogProfile("Luna", null, null, false, null);
-
-        assertEquals(List.of(mochi), catalog.findPossibleDuplicates(" mochi ", null, null));
-        assertEquals(List.of(mochi), catalog.findPossibleDuplicates("Mochi", "tan and white", null));
-        assertTrue(catalog.findPossibleDuplicates("Mochi", "Black", null).isEmpty());
-        assertTrue(catalog.findPossibleDuplicates("Mochi", null, mochi.getDogId()).isEmpty());
-        assertTrue(catalog.findPossibleDuplicates(" ", null, null).isEmpty());
-        assertNotEquals(mochi, other);
     }
 
     @Test

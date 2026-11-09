@@ -1,69 +1,99 @@
 package edu.scu.campaws.service;
 
 import edu.scu.campaws.domain.DogProfile;
+import edu.scu.campaws.repository.DogRepository;
+
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Optional;
 
-
+/** Dog profiles, stored in PostgreSQL. */
 @Service
+@Transactional(readOnly = true)
 public class DogCatalog {
-    private final Map<Integer, DogProfile> dogProfiles =
-            new LinkedHashMap<>();
+    /** Default radius for {@link #findNearbyDogs(double, double)}. */
+    public static final double DEFAULT_NEARBY_METERS = 1000;
+    public static final double MAX_NEARBY_METERS = 50_000;
 
-    private int nextDogId = 1;
+    private final DogRepository dogs;
 
-    public synchronized void createDogProfile(DogProfile dog) {
+    public DogCatalog(DogRepository dogs) {
+        this.dogs = dogs;
+    }
+
+    /**
+     * Builds an unsaved profile with a fresh ID. Fill in the rest, then pass it to
+     * {@link #createDogProfile(DogProfile)}. Nothing is stored if you never do.
+     */
+    @Transactional
+    public DogProfile newDogProfile(
+            String name,
+            String temperament,
+            boolean canBePetted,
+            String campusFrequency) {
+
+        return new DogProfile(
+                Math.toIntExact(dogs.nextDogId()),
+                name,
+                temperament,
+                canBePetted,
+                campusFrequency
+        );
+    }
+
+    /** Stores a new profile created with {@link #newDogProfile}. */
+    @Transactional
+    public DogProfile createDogProfile(DogProfile dog) {
         if (dog == null) {
             throw new IllegalArgumentException(
                     "Dog profile cannot be null."
             );
         }
 
-        if (dogProfiles.containsKey(dog.getDogId())) {
+        if (dogs.existsById(dog.getDogId())) {
             throw new IllegalArgumentException(
                     "A dog with this ID already exists."
             );
         }
 
-        dogProfiles.put(dog.getDogId(), dog);
-        nextDogId = Math.max(nextDogId, dog.getDogId() + 1);
+        return dogs.save(dog);
     }
 
-    public synchronized DogProfile createDogProfile(
+    /** Shortcut: create and store a profile with just the basic details. */
+    @Transactional
+    public DogProfile createDogProfile(
             String name,
-            String breed,
             String temperament,
             boolean canBePetted,
             String campusFrequency) {
 
-        DogProfile profile = new DogProfile(
-                nextDogId,
-                name,
-                breed,
-                temperament,
-                canBePetted,
-                campusFrequency,
-                0.0f,
-                0.0f
+        return createDogProfile(
+                newDogProfile(name, temperament, canBePetted, campusFrequency)
         );
-
-        createDogProfile(profile);
-        return profile;
     }
 
-    public synchronized Optional<DogProfile> findById(int dogId) {
-        return Optional.ofNullable(dogProfiles.get(dogId));
+    /** Saves changes made to an existing profile. */
+    @Transactional
+    public DogProfile save(DogProfile dog) {
+        if (dog == null || !dogs.existsById(dog.getDogId())) {
+            throw new NoSuchElementException(
+                    "Dog profile not found."
+            );
+        }
+
+        return dogs.save(dog);
     }
 
-    public synchronized DogProfile requireById(int dogId) {
+    public Optional<DogProfile> findById(int dogId) {
+        return dogs.findById(dogId);
+    }
+
+    public DogProfile requireById(int dogId) {
         if (dogId <= 0) {
             throw new NoSuchElementException(
                     "Dog profile not found."
@@ -77,95 +107,58 @@ public class DogCatalog {
         );
     }
 
-    public synchronized List<DogProfile> getAllDogProfiles() {
-        return new ArrayList<>(dogProfiles.values());
+    public List<DogProfile> getAllDogProfiles() {
+        return dogs.findAllByOrderByDogIdAsc();
     }
 
-    public synchronized List<DogProfile> findDogs(
-            String query,
-            String breed,
-            Boolean canBePetted) {
-
+    public List<DogProfile> findDogs(String query, Boolean canBePetted) {
         String q = normalizeFilter(query);
-        String requestedBreed = normalizeFilter(breed);
-        List<DogProfile> results = new ArrayList<>();
-
-        for (DogProfile dog : dogProfiles.values()) {
-            boolean nameMatches =
-                    q == null
-                            || dog.getName().toLowerCase(Locale.ROOT)
-                            .contains(q);
-
-            boolean breedMatches =
-                    requestedBreed == null
-                            || (dog.getBreed() != null
-                            && dog.getBreed().toLowerCase(Locale.ROOT)
-                            .equals(requestedBreed));
-
-            boolean pettingMatches =
-                    canBePetted == null
-                            || dog.isCanBePetted() == canBePetted;
-
-            if (nameMatches && breedMatches && pettingMatches) {
-                results.add(dog);
-            }
-        }
-
-        return results;
+        String pattern = q == null ? "" : escapeLike(q);
+        return canBePetted == null
+                ? dogs.searchByName(pattern)
+                : dogs.searchByNameAndPetting(pattern, canBePetted);
     }
 
-    public synchronized List<DogProfile> searchByName(String name) {
-        return findDogs(name, null, null);
+    public List<DogProfile> searchByName(String name) {
+        return findDogs(name, null);
     }
 
-    public synchronized List<DogProfile> filterByAttributes(
-            String breed, Boolean canBePetted) {
-        return findDogs(null, breed, canBePetted);
+    public List<DogProfile> filterByAttributes(Boolean canBePetted) {
+        return findDogs(null, canBePetted);
     }
 
+    /** Dogs last seen within 1 km, closest first. */
+    public List<DogProfile> findNearbyDogs(double latitude, double longitude) {
+        return findNearbyDogs(latitude, longitude, DEFAULT_NEARBY_METERS);
+    }
 
-    public synchronized List<DogProfile> findNearbyDogs(
-            float latitude, float longitude) {
+    /** Dogs last seen within {@code radiusMeters}, closest first. */
+    public List<DogProfile> findNearbyDogs(
+            double latitude, double longitude, double radiusMeters) {
 
         DogProfile.validateCoordinates(latitude, longitude);
-        List<DogProfile> results = new ArrayList<>();
 
-        for (DogProfile dog : dogProfiles.values()) {
-            if (dog.getLastSeenLatitude() == 0.0f
-                    && dog.getLastSeenLongitude() == 0.0f) {
-                continue;
-            }
-
-            if (distanceKm(
-                    latitude,
-                    longitude,
-                    dog.getLastSeenLatitude(),
-                    dog.getLastSeenLongitude()) <= 1.0) {
-                results.add(dog);
-            }
+        if (!Double.isFinite(radiusMeters)
+                || radiusMeters <= 0
+                || radiusMeters > MAX_NEARBY_METERS) {
+            throw new IllegalArgumentException(
+                    "Radius must be greater than 0 and at most "
+                            + (int) MAX_NEARBY_METERS + " meters."
+            );
         }
 
-        return results;
+        return dogs.findWithinMeters(latitude, longitude, radiusMeters);
     }
 
-    public synchronized List<DogProfile> viewLeaderboard() {
-        List<DogProfile> result =
-                new ArrayList<>(dogProfiles.values());
-
-        result.sort(
-                Comparator.comparingInt(DogProfile::getLikeCount)
-                        .reversed()
-                        .thenComparingInt(DogProfile::getDogId)
-        );
-
-        return result;
+    public List<DogProfile> viewLeaderboard() {
+        return dogs.findAllByOrderByLikeCountDescDogIdAsc();
     }
 
     /**
      * Profiles that are probably the same dog: the name matches (ignoring case and spacing)
      * and the fur colors don't contradict each other (either one blank, or equal).
      */
-    public synchronized List<DogProfile> findPossibleDuplicates(
+    public List<DogProfile> findPossibleDuplicates(
             String name, String furColor, Integer ignoreDogId) {
 
         String wantedName = normalizeFilter(name);
@@ -175,57 +168,43 @@ public class DogCatalog {
         String wantedFur = normalizeFilter(furColor);
 
         List<DogProfile> results = new ArrayList<>();
-        for (DogProfile dog : dogProfiles.values()) {
+        for (DogProfile dog : dogs.findByNameIgnoreCase(wantedName)) {
             if (ignoreDogId != null && dog.getDogId() == ignoreDogId) {
                 continue;
             }
             String dogFur = normalizeFilter(dog.getFurColor());
-            boolean sameName = dog.getName().toLowerCase(Locale.ROOT).equals(wantedName);
-            boolean furCompatible = wantedFur == null || dogFur == null || dogFur.equals(wantedFur);
-            if (sameName && furCompatible) {
+            if (wantedFur == null || dogFur == null || dogFur.equals(wantedFur)) {
                 results.add(dog);
             }
         }
         return results;
     }
 
-    public synchronized DogProfile likeDog(int dogId) {
-        DogProfile dog = requireById(dogId);
-        dog.addLike();
-        return dog;
+    @Transactional
+    public DogProfile likeDog(int dogId) {
+        requireById(dogId);
+
+        if (dogs.incrementLikes(dogId) == 0) {
+            throw new IllegalStateException(
+                    "Like count has reached its maximum value."
+            );
+        }
+
+        return requireById(dogId);
     }
 
-    public synchronized int getDogCount() {
-        return dogProfiles.size();
+    public long getDogCount() {
+        return dogs.count();
     }
 
-    private String normalizeFilter(String value) {
+    private static String normalizeFilter(String value) {
         return value == null || value.isBlank()
                 ? null
                 : value.trim().toLowerCase(Locale.ROOT);
     }
 
-    private double distanceKm(
-            double lat1,
-            double lon1,
-            double lat2,
-            double lon2) {
-
-        double radius = 6371.0088;
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLon = Math.toRadians(lon2 - lon1);
-
-        double a =
-                Math.pow(Math.sin(dLat / 2), 2)
-                        + Math.cos(Math.toRadians(lat1))
-                        * Math.cos(Math.toRadians(lat2))
-                        * Math.pow(Math.sin(dLon / 2), 2);
-
-        double bounded = Math.max(0.0, Math.min(1.0, a));
-
-        return radius * 2 * Math.atan2(
-                Math.sqrt(bounded),
-                Math.sqrt(1 - bounded)
-        );
+    /** Escapes LIKE wildcards so a search for "50%" matches literally. */
+    private static String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
     }
 }

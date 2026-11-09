@@ -22,6 +22,8 @@ export default function AppTabs() {
               key={item.name}
               name={item.name}
               href={item.href}
+              // Tapping a tab always opens its main screen (e.g. the search list, not an old profile).
+              resetOnFocus
               asChild
             >
               <TabButton icon={item.icon} label={item.label} />

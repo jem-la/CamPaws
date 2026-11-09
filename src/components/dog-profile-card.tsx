@@ -1,130 +1,106 @@
-import { Image, type ImageSource } from 'expo-image';
-import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Image } from 'expo-image';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { ThemedText } from '@/components/themed-text';
-import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { showAlert } from '@/lib/confirm';
+import { type Dog, dogTint, furSwatches, likeDog } from '@/lib/dogs-store';
 
-export type DogProfile = {
-  id: string;
-  name: string;
-  breed: string;
-  location: string;
-  photo?: ImageSource;
-  /** background behind the photo, also used as the placeholder when there is no photo */
-  tint: string;
+export const RED = '#c92e45';
+
+type DogCardProps = {
+  dog: Dog;
+  /** Optional leaderboard position shown before the photo. */
+  rank?: number;
 };
 
-type DogProfileCardProps = {
-  dog: DogProfile;
-  accentColor: string;
-  onPress?: () => void;
-};
+/** A dog row used across Home, Leaderboard and My Dogs. Tapping it opens the profile. */
+export function DogCard({ dog, rank }: DogCardProps) {
+  const swatches = furSwatches(dog.furColor);
 
-export function DogProfileCard({ dog, accentColor, onPress }: DogProfileCardProps) {
-  const theme = useTheme();
-  const [favorited, setFavorited] = useState(false);
+  const like = () => {
+    likeDog(dog.id).catch((e: Error) => showAlert('Couldn’t like', e.message));
+  };
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.card,
-        { borderColor: theme.backgroundSelected, backgroundColor: theme.background },
-        pressed && styles.pressed,
-      ]}>
-      <View style={[styles.photo, { backgroundColor: dog.tint }]}>
-        {dog.photo ? (
-          <Image source={dog.photo} style={StyleSheet.absoluteFill} contentFit="cover" />
-        ) : (
-          <SymbolView
-            name={{ ios: 'pawprint.fill', android: 'pets', web: 'pets' }}
-            tintColor="rgba(0, 0, 0, 0.25)"
-            size={40}
-          />
-        )}
-      </View>
-
-      <View style={styles.info}>
-        <ThemedText style={styles.name}>{dog.name}</ThemedText>
-        <ThemedText type="small" themeColor="textSecondary">
-          {dog.breed}
-        </ThemedText>
-        <View style={styles.locationRow}>
-          <SymbolView
-            name={{ ios: 'mappin.and.ellipse', android: 'location_on', web: 'location_on' }}
-            tintColor={theme.textSecondary}
-            size={14}
-          />
-          <ThemedText style={styles.location} themeColor="textSecondary">
-            {dog.location}
-          </ThemedText>
+    <View style={styles.card}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Open ${dog.name}'s profile`}
+        style={({ pressed }) => [styles.main, pressed && styles.pressed]}
+        onPress={() =>
+          // withAnchor keeps the search list under the profile so Back works across tabs.
+          router.push({ pathname: '/explore/[id]', params: { id: dog.id } }, { withAnchor: true })
+        }>
+        {rank !== undefined && <Text style={styles.rank}>{rank}</Text>}
+        <View style={[styles.photo, { backgroundColor: dogTint(dog) }]}>
+          {dog.photos.length > 0 && (
+            <Image
+              source={{ uri: dog.photos[0] }}
+              style={StyleSheet.absoluteFill}
+              contentFit="cover"
+              accessibilityLabel={`Photo of ${dog.name}`}
+            />
+          )}
+        </View>
+        <View style={styles.info}>
+          <Text style={styles.name} numberOfLines={1}>
+            {dog.name}
+          </Text>
+          {dog.furColor && (
+            <Text style={styles.sub} numberOfLines={1}>
+              {dog.furColor}
+            </Text>
+          )}
+          {dog.location && (
+            <Text style={styles.location} numberOfLines={1}>
+              ⌖ {dog.location}
+            </Text>
+          )}
+        </View>
+      </Pressable>
+      <View style={styles.right}>
+        <Pressable
+          hitSlop={12}
+          accessibilityRole="button"
+          accessibilityLabel={`Like ${dog.name}, ${dog.likes} likes`}
+          onPress={like}
+          style={styles.likeButton}>
+          <Text style={styles.heart}>♥</Text>
+          <Text style={styles.likes}>{dog.likes}</Text>
+        </Pressable>
+        <View style={styles.swatches}>
+          {swatches.map((c) => (
+            <View key={c} style={[styles.swatch, { backgroundColor: c }]} />
+          ))}
         </View>
       </View>
-
-      <Pressable
-        hitSlop={12}
-        accessibilityRole="button"
-        accessibilityLabel={favorited ? `Unfavorite ${dog.name}` : `Favorite ${dog.name}`}
-        onPress={() => setFavorited((value) => !value)}
-        style={styles.favorite}>
-        <SymbolView
-          name={{
-            ios: favorited ? 'heart.fill' : 'heart',
-            android: 'favorite',
-            web: 'favorite',
-          }}
-          tintColor={accentColor}
-          size={22}
-        />
-      </Pressable>
-    </Pressable>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.three,
-    padding: Spacing.two,
     borderWidth: 1,
-    borderRadius: 16,
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  photo: {
-    width: 120,
-    height: 100,
-    borderRadius: 10,
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  info: {
-    flex: 1,
-    gap: Spacing.half,
-  },
-  name: {
-    fontSize: 22,
-    lineHeight: 28,
-    fontWeight: 700,
-  },
-  locationRow: {
+    borderColor: '#eee7e8',
+    borderRadius: 15,
+    padding: 6,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.one,
-    marginTop: Spacing.one,
+    marginBottom: 10,
+    backgroundColor: '#fff',
   },
-  location: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  favorite: {
-    alignSelf: 'flex-start',
-    padding: Spacing.one,
-  },
+  main: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+  pressed: { opacity: 0.7 },
+  rank: { width: 28, fontSize: 18, fontWeight: '800', color: RED, textAlign: 'center' },
+  photo: { width: 76, height: 70, borderRadius: 10, overflow: 'hidden' },
+  info: { flex: 1, marginLeft: 13, gap: 3 },
+  name: { fontSize: 16, fontWeight: '800', color: '#2d272d' },
+  sub: { fontSize: 12, color: '#8f858b' },
+  location: { fontSize: 11, color: '#898188' },
+  right: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, gap: 6 },
+  likeButton: { alignItems: 'center' },
+  heart: { fontSize: 22, color: RED },
+  likes: { fontSize: 11, color: '#8f858b' },
+  swatches: { flexDirection: 'row', gap: 3 },
+  swatch: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: '#e2d8d4' },
 });

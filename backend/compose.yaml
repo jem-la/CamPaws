@@ -1,0 +1,35 @@
+# Local development database: PostgreSQL 17 with the PostGIS extension.
+#
+# `./gradlew bootRun` starts this automatically (Spring Boot Docker Compose support),
+# so you only need Docker Desktop running. To manage it by hand:
+#   docker compose up -d      # start
+#   docker compose down       # stop (data is kept in the campaws-db volume)
+#   docker compose down -v    # stop AND delete all data
+#
+# The credentials below are for local development only.
+services:
+  db:
+    # Multi-arch build (Intel/AMD and Apple Silicon) of the official postgis/postgis image,
+    # published by one of its maintainers. postgis/postgis itself is amd64-only.
+    image: imresamu/postgis:17-3.5
+    environment:
+      POSTGRES_DB: campaws
+      POSTGRES_USER: campaws
+      POSTGRES_PASSWORD: campaws
+    ports:
+      # Host port 55432 avoids clashing with any other Postgres on your machine.
+      # Override with CAMPAWS_DB_PORT=<port> if that one is taken too.
+      - "${CAMPAWS_DB_PORT:-55432}:5432"
+    volumes:
+      - campaws-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U campaws -d campaws"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    labels:
+      # The image isn't named "postgres", so tell Spring Boot how to connect to it.
+      org.springframework.boot.service-connection: postgres
+
+volumes:
+  campaws-db:

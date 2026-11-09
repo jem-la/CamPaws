@@ -1,40 +1,90 @@
 package edu.scu.campaws.domain;
 
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderColumn;
+import jakarta.persistence.Table;
+
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
+/**
+ * A campus dog. Stored in the {@code dogs} table (see db/migration). The last-seen
+ * latitude/longitude also feed a PostGIS {@code last_seen_point} column used for
+ * nearby-dog queries; that column is computed by the database, not mapped here.
+ */
+@Entity
+@Table(name = "dogs")
 public class DogProfile {
-    private final int dogId;
-    private String name;
-    private String breed;
-    private String temperament;
-    private boolean canBePetted;
-    private String campusFrequency;
-    private final float lastSeenLatitude;
-    private final float lastSeenLongitude;
-    private int likeCount;
-    private String photoUrl;
-    private List<String> photoUrls = List.of();
-    private String furColor;
-    private String location;
-    private String about;
-    private String pettingPolicy;
-    private String addedBy;
-
     public static final int MAX_PHOTOS = 5;
     private static final Set<String> PETTING_POLICIES = Set.of("ask", "yes", "no");
 
+    @Id
+    @Column(name = "dog_id")
+    private int dogId;
+
+    @Column(nullable = false, length = 80)
+    private String name;
+
+    @Column(length = 120)
+    private String temperament;
+
+    @Column(name = "can_be_petted", nullable = false)
+    private boolean canBePetted;
+
+    @Column(name = "campus_frequency", length = 120)
+    private String campusFrequency;
+
+    @Column(name = "last_seen_latitude")
+    private Double lastSeenLatitude;
+
+    @Column(name = "last_seen_longitude")
+    private Double lastSeenLongitude;
+
+    @Column(name = "like_count", nullable = false)
+    private int likeCount;
+
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "dog_photos", joinColumns = @JoinColumn(name = "dog_id"))
+    @OrderColumn(name = "sort_order")
+    @Column(name = "url", nullable = false, length = 2048)
+    private List<String> photoUrls = new ArrayList<>();
+
+    @Column(name = "fur_color", length = 120)
+    private String furColor;
+
+    /** Human-readable spot such as "Library lawn". */
+    @Column(length = 120)
+    private String location;
+
+    @Column(length = 120)
+    private String about;
+
+    @Column(name = "petting_policy", nullable = false, length = 3)
+    private String pettingPolicy;
+
+    @Column(name = "added_by", length = 120)
+    private String addedBy;
+
+    /** Required by JPA. */
+    protected DogProfile() {
+    }
+
+    /** A profile without a known location. */
     public DogProfile(
             int dogId,
             String name,
-            String breed,
             String temperament,
             boolean canBePetted,
-            String campusFrequency,
-            float lastSeenLatitude,
-            float lastSeenLongitude) {
+            String campusFrequency) {
 
         if (dogId <= 0) {
             throw new IllegalArgumentException(
@@ -43,18 +93,36 @@ public class DogProfile {
         }
 
         validateName(name);
-        validateCoordinates(lastSeenLatitude, lastSeenLongitude);
 
         this.dogId = dogId;
         this.name = name.trim();
-        this.breed = normalizeOptional(breed);
         this.temperament = normalizeOptional(temperament);
         this.canBePetted = canBePetted;
         this.campusFrequency = normalizeOptional(campusFrequency);
-        this.lastSeenLatitude = lastSeenLatitude;
-        this.lastSeenLongitude = lastSeenLongitude;
         this.likeCount = 0;
         this.pettingPolicy = canBePetted ? "yes" : "ask";
+    }
+
+    /**
+     * A profile last seen at the given coordinates. For backwards compatibility,
+     * (0, 0) means "location unknown".
+     */
+    public DogProfile(
+            int dogId,
+            String name,
+            String temperament,
+            boolean canBePetted,
+            String campusFrequency,
+            double lastSeenLatitude,
+            double lastSeenLongitude) {
+
+        this(dogId, name, temperament, canBePetted, campusFrequency);
+        validateCoordinates(lastSeenLatitude, lastSeenLongitude);
+
+        if (lastSeenLatitude != 0.0 || lastSeenLongitude != 0.0) {
+            this.lastSeenLatitude = lastSeenLatitude;
+            this.lastSeenLongitude = lastSeenLongitude;
+        }
     }
 
     /**
@@ -87,7 +155,6 @@ public class DogProfile {
 
     public void inputDetails(
             String name,
-            String breed,
             String temperament,
             boolean canBePetted,
             String campusFrequency) {
@@ -95,15 +162,34 @@ public class DogProfile {
         validateName(name);
 
         this.name = name.trim();
-        this.breed = normalizeOptional(breed);
         this.temperament = normalizeOptional(temperament);
         this.canBePetted = canBePetted;
         this.campusFrequency = normalizeOptional(campusFrequency);
     }
 
+    /**
+     * Records where the dog was last seen. Pass both values, or both null to clear it.
+     */
+    public void setLastSeenLocation(Double latitude, Double longitude) {
+        if (latitude == null && longitude == null) {
+            this.lastSeenLatitude = null;
+            this.lastSeenLongitude = null;
+            return;
+        }
+
+        if (latitude == null || longitude == null) {
+            throw new IllegalArgumentException(
+                    "Latitude and longitude must be given together."
+            );
+        }
+
+        validateCoordinates(latitude, longitude);
+        this.lastSeenLatitude = latitude;
+        this.lastSeenLongitude = longitude;
+    }
+
     public String viewDetails() {
         return "Name: " + name
-                + ", Breed: " + displayOptional(breed)
                 + ", Temperament: " + displayOptional(temperament)
                 + ", Can be petted: " + canBePetted
                 + ", Campus frequency: "
@@ -128,10 +214,6 @@ public class DogProfile {
         return name;
     }
 
-    public String getBreed() {
-        return breed;
-    }
-
     public String getTemperament() {
         return temperament;
     }
@@ -144,20 +226,27 @@ public class DogProfile {
         return campusFrequency;
     }
 
-    public float getLastSeenLatitude() {
+    /** Null when the location is unknown. */
+    public Double getLastSeenLatitude() {
         return lastSeenLatitude;
     }
 
-    public float getLastSeenLongitude() {
+    /** Null when the location is unknown. */
+    public Double getLastSeenLongitude() {
         return lastSeenLongitude;
+    }
+
+    public boolean hasLastSeenLocation() {
+        return lastSeenLatitude != null && lastSeenLongitude != null;
     }
 
     public int getLikeCount() {
         return likeCount;
     }
 
+    /** The profile photo: the first of {@link #getPhotoUrls()}. */
     public String getPhotoUrl() {
-        return photoUrl;
+        return photoUrls.isEmpty() ? null : photoUrls.get(0);
     }
 
     public void setPhotoUrl(String photoUrl) {
@@ -183,12 +272,13 @@ public class DogProfile {
             normalized.add(normalizePhotoUrl(url));
         }
 
-        this.photoUrls = List.copyOf(normalized);
-        this.photoUrl = normalized.get(0);
+        // Mutate in place so JPA keeps tracking the same collection.
+        this.photoUrls.clear();
+        this.photoUrls.addAll(normalized);
     }
 
     public List<String> getPhotoUrls() {
-        return photoUrls;
+        return Collections.unmodifiableList(photoUrls);
     }
 
     public String getFurColor() {
@@ -230,6 +320,12 @@ public class DogProfile {
                 true, 0, "http://", 0, 7))) {
             throw new IllegalArgumentException(
                     "Photo URL must start with http:// or https://."
+            );
+        }
+
+        if (normalized.length() > 2048) {
+            throw new IllegalArgumentException(
+                    "Photo URL must be at most 2048 characters."
             );
         }
 

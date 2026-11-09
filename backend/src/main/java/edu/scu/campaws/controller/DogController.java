@@ -23,10 +23,9 @@ public class DogController {
     @GetMapping
     public List<DogProfileResponse> listDogs(
             @RequestParam(required = false) String q,
-            @RequestParam(required = false) String breed,
             @RequestParam(required = false) Boolean canBePetted) {
 
-        return catalog.findDogs(q, breed, canBePetted)
+        return catalog.findDogs(q, canBePetted)
                 .stream()
                 .map(DogProfileResponse::from)
                 .toList();
@@ -35,6 +34,19 @@ public class DogController {
     @GetMapping("/leaderboard")
     public List<DogProfileResponse> leaderboard() {
         return catalog.viewLeaderboard()
+                .stream()
+                .map(DogProfileResponse::from)
+                .toList();
+    }
+
+    /** Dogs last seen near a point, closest first. {@code radiusMeters} defaults to 1 km. */
+    @GetMapping("/nearby")
+    public List<DogProfileResponse> nearbyDogs(
+            @RequestParam double lat,
+            @RequestParam double lng,
+            @RequestParam(defaultValue = "1000") double radiusMeters) {
+
+        return catalog.findNearbyDogs(lat, lng, radiusMeters)
                 .stream()
                 .map(DogProfileResponse::from)
                 .toList();
@@ -67,36 +79,24 @@ public class DogController {
             @RequestBody DogProfileRequest request) {
 
         validateRequest(request);
-
         List<String> photoUrls = validatedPhotoUrls(request);
 
-        // Validate every field on a throwaway copy first, so a bad value can't leave
-        // a half-made profile in the catalog.
-        applyDetails(new DogProfile(
-                1,
+        // Build and validate the whole profile first; it is only stored once everything is valid.
+        DogProfile profile = catalog.newDogProfile(
                 request.name(),
-                request.breed(),
-                request.temperament(),
-                Boolean.TRUE.equals(request.canBePetted()),
-                request.campusFrequency(),
-                0.0f,
-                0.0f
-        ), request, photoUrls);
-
-        DogProfile profile = catalog.createDogProfile(
-                request.name(),
-                request.breed(),
                 request.temperament(),
                 Boolean.TRUE.equals(request.canBePetted()),
                 request.campusFrequency()
         );
 
         applyDetails(profile, request, photoUrls);
+        profile.setLastSeenLocation(request.latitude(), request.longitude());
         profile.setAddedBy(request.addedBy());
 
-        return DogProfileResponse.from(profile);
+        return DogProfileResponse.from(catalog.createDogProfile(profile));
     }
 
+    /** Updates a profile. Omitting latitude/longitude keeps the current location. */
     @PutMapping("/{dogId}")
     public DogProfileResponse updateDog(
             @PathVariable int dogId,
@@ -109,7 +109,6 @@ public class DogController {
 
         profile.inputDetails(
                 request.name(),
-                request.breed(),
                 request.temperament(),
                 Boolean.TRUE.equals(request.canBePetted()),
                 request.campusFrequency()
@@ -117,7 +116,11 @@ public class DogController {
 
         applyDetails(profile, request, photoUrls);
 
-        return DogProfileResponse.from(profile);
+        if (request.latitude() != null || request.longitude() != null) {
+            profile.setLastSeenLocation(request.latitude(), request.longitude());
+        }
+
+        return DogProfileResponse.from(catalog.save(profile));
     }
 
     @PostMapping("/{dogId}/likes")
