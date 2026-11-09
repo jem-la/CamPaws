@@ -3,6 +3,8 @@ package edu.scu.campaws;
 
 import edu.scu.campaws.domain.DogProfile;
 
+import java.lang.reflect.Field;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -50,3 +50,5 @@ example
 .gradle/
 **/.gradle/
 **/build/
+# Dog photos uploaded to the local backend
+backend/uploads/

@@ -19,7 +19,9 @@ function WebTabs() {
       <View style={styles.page}><Slot /></View>
       <View style={styles.tabBar}>
         {ITEMS.map(item => {
-          const selected = pathname === item.route || (item.route === '/' && pathname === '/index');
+          const selected = item.route === '/'
+            ? pathname === '/' || pathname === '/index'
+            : pathname === item.route || pathname.startsWith(`${item.route}/`);
           return (
             <Pressable key={item.route} accessibilityRole="tab" accessibilityState={{ selected }}
               onPress={() => router.push(item.route as any)} style={styles.tab}>

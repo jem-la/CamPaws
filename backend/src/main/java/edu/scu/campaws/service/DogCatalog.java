@@ -161,6 +161,34 @@ public class DogCatalog {
         return result;
     }
 
+    /**
+     * Profiles that are probably the same dog: the name matches (ignoring case and spacing)
+     * and the fur colors don't contradict each other (either one blank, or equal).
+     */
+    public synchronized List<DogProfile> findPossibleDuplicates(
+            String name, String furColor, Integer ignoreDogId) {
+
+        String wantedName = normalizeFilter(name);
+        if (wantedName == null) {
+            return List.of();
+        }
+        String wantedFur = normalizeFilter(furColor);
+
+        List<DogProfile> results = new ArrayList<>();
+        for (DogProfile dog : dogProfiles.values()) {
+            if (ignoreDogId != null && dog.getDogId() == ignoreDogId) {
+                continue;
+            }
+            String dogFur = normalizeFilter(dog.getFurColor());
+            boolean sameName = dog.getName().toLowerCase(Locale.ROOT).equals(wantedName);
+            boolean furCompatible = wantedFur == null || dogFur == null || dogFur.equals(wantedFur);
+            if (sameName && furCompatible) {
+                results.add(dog);
+            }
+        }
+        return results;
+    }
+
     public synchronized DogProfile likeDog(int dogId) {
         DogProfile dog = requireById(dogId);
         dog.addLike();

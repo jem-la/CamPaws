@@ -40,6 +40,19 @@ public class DogController {
                 .toList();
     }
 
+    /** Used before creating a profile to suggest an existing one instead (alternative flow 2). */
+    @GetMapping("/duplicates")
+    public List<DogProfileResponse> possibleDuplicates(
+            @RequestParam String name,
+            @RequestParam(required = false) String furColor,
+            @RequestParam(required = false) Integer ignoreDogId) {
+
+        return catalog.findPossibleDuplicates(name, furColor, ignoreDogId)
+                .stream()
+                .map(DogProfileResponse::from)
+                .toList();
+    }
+
     @GetMapping("/{dogId}")
     public DogProfileResponse getDog(
             @PathVariable int dogId) {
@@ -55,8 +68,20 @@ public class DogController {
 
         validateRequest(request);
 
-        Photo photo = new Photo(1);
-        photo.uploadPhoto(request.photoUrl());
+        List<String> photoUrls = validatedPhotoUrls(request);
+
+        // Validate every field on a throwaway copy first, so a bad value can't leave
+        // a half-made profile in the catalog.
+        applyDetails(new DogProfile(
+                1,
+                request.name(),
+                request.breed(),
+                request.temperament(),
+                Boolean.TRUE.equals(request.canBePetted()),
+                request.campusFrequency(),
+                0.0f,
+                0.0f
+        ), request, photoUrls);
 
         DogProfile profile = catalog.createDogProfile(
                 request.name(),
@@ -66,7 +91,8 @@ public class DogController {
                 request.campusFrequency()
         );
 
-        profile.setPhotoUrl(photo.getImageUrl());
+        applyDetails(profile, request, photoUrls);
+        profile.setAddedBy(request.addedBy());
 
         return DogProfileResponse.from(profile);
     }
@@ -77,9 +103,7 @@ public class DogController {
             @RequestBody DogProfileRequest request) {
 
         validateRequest(request);
-
-        Photo photo = new Photo(1);
-        photo.uploadPhoto(request.photoUrl());
+        List<String> photoUrls = validatedPhotoUrls(request);
 
         DogProfile profile = catalog.requireById(dogId);
 
@@ -91,7 +115,7 @@ public class DogController {
                 request.campusFrequency()
         );
 
-        profile.setPhotoUrl(photo.getImageUrl());
+        applyDetails(profile, request, photoUrls);
 
         return DogProfileResponse.from(profile);
     }
@@ -102,6 +126,31 @@ public class DogController {
         return DogProfileResponse.from(
                 catalog.likeDog(dogId)
         );
+    }
+
+    private List<String> validatedPhotoUrls(DogProfileRequest request) {
+        List<String> urls = request.resolvedPhotoUrls();
+        if (urls.size() > DogProfile.MAX_PHOTOS) {
+            throw new IllegalArgumentException(
+                    "A dog profile can have at most " + DogProfile.MAX_PHOTOS + " photos."
+            );
+        }
+        int photoId = 1;
+        for (String url : urls) {
+            new Photo(photoId++).uploadPhoto(url);
+        }
+        return urls;
+    }
+
+    private void applyDetails(
+            DogProfile profile, DogProfileRequest request, List<String> photoUrls) {
+        profile.inputAppearance(
+                request.furColor(),
+                request.location(),
+                request.about(),
+                request.pettingPolicy()
+        );
+        profile.setPhotoUrls(photoUrls);
     }
 
     private void validateRequest(DogProfileRequest request) {
@@ -117,8 +166,7 @@ public class DogController {
             );
         }
 
-        if (request.photoUrl() == null
-                || request.photoUrl().isBlank()) {
+        if (request.resolvedPhotoUrls().isEmpty()) {
             throw new IllegalArgumentException(
                     "At least one accessible photo URL is required."
             );

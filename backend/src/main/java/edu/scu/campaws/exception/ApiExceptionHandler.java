@@ -5,6 +5,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
+import org.springframework.web.multipart.support.MissingServletRequestPartException;
 
 import java.time.Instant;
 import java.util.Map;
@@ -25,6 +28,23 @@ public class ApiExceptionHandler {
         return response(
                 HttpStatus.BAD_REQUEST,
                 "Request body is missing or malformed."
+        );
+    }
+
+    @ExceptionHandler({
+            MissingServletRequestParameterException.class,
+            MissingServletRequestPartException.class
+    })
+    public ResponseEntity<Map<String, Object>> missingParameter(Exception exception) {
+        return response(HttpStatus.BAD_REQUEST, exception.getMessage());
+    }
+
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<Map<String, Object>> tooLarge(
+            MaxUploadSizeExceededException exception) {
+        return response(
+                HttpStatus.CONTENT_TOO_LARGE,
+                "Photos must be 10 MB or smaller."
         );
     }
 
