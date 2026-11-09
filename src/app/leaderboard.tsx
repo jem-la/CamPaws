@@ -1,106 +1,63 @@
-import { useCallback, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useCallback, useMemo } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { fetchLeaderboard, likeDog } from '@/api/dogs';
-import { DogProfileCard, type DogProfile } from '@/components/dog-profile-card';
-import { ThemedText } from '@/components/themed-text';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
-
-const ACCENT = '#C8102E';
+import { DogCard, RED } from '@/components/dog-profile-card';
+import { rankByLikes, refreshDogs, useDogsState } from '@/lib/dogs-store';
 
 export default function LeaderboardScreen() {
-  const theme = useTheme();
-  const insets = useSafeAreaInsets();
-  const [dogs, setDogs] = useState<DogProfile[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const load = useCallback((signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
-    fetchLeaderboard(signal)
-      .then(setDogs)
-      .catch((e) => {
-        if (e instanceof Error && e.name === 'AbortError') return;
-        setError(e instanceof Error ? e.message : 'Something went wrong.');
-      })
-      .finally(() => {
-        if (!signal?.aborted) setLoading(false);
-      });
-  }, []);
+  const { dogs, status, error } = useDogsState();
+  const ranked = useMemo(() => rankByLikes(dogs), [dogs]);
 
   // Reload whenever the tab gains focus so new likes show up.
   useFocusEffect(
     useCallback(() => {
-      const controller = new AbortController();
-      load(controller.signal);
-      return () => controller.abort();
-    }, [load])
+      refreshDogs();
+    }, []),
   );
 
   return (
-    <FlatList
-      data={dogs}
-      keyExtractor={(dog) => dog.id}
-      renderItem={({ item, index }) => (
-        <View style={styles.row}>
-          <ThemedText style={styles.rank}>{index + 1}</ThemedText>
-          <View style={styles.card}>
-            <DogProfileCard dog={item} accentColor={ACCENT} onLike={(dog) => likeDog(dog.id)} />
+    <SafeAreaView style={styles.safe} edges={['top']}>
+      <FlatList
+        data={ranked}
+        keyExtractor={(d) => d.id}
+        contentContainerStyle={styles.content}
+        renderItem={({ item, index }) => <DogCard dog={item} rank={index + 1} />}
+        ListHeaderComponent={
+          <View style={styles.header}>
+            <Text style={styles.heading} accessibilityRole="header">
+              Leaderboard
+            </Text>
+            <Text style={styles.subtitle}>The most liked dogs on campus. Tap ♥ to cheer for one.</Text>
           </View>
-        </View>
-      )}
-      ListHeaderComponent={
-        <View style={styles.header}>
-          <ThemedText style={styles.title}>Leaderboard</ThemedText>
-          <ThemedText themeColor="textSecondary">The most liked dogs on campus.</ThemedText>
-        </View>
-      }
-      ListEmptyComponent={
-        loading ? (
-          <ActivityIndicator color={ACCENT} style={styles.status} />
-        ) : error ? (
-          <View style={styles.status}>
-            <ThemedText themeColor="textSecondary">{error}</ThemedText>
-            <Pressable onPress={() => load()} accessibilityRole="button">
-              <ThemedText type="smallBold" style={{ color: ACCENT }}>
-                Try again
-              </ThemedText>
-            </Pressable>
-          </View>
-        ) : (
-          <ThemedText themeColor="textSecondary" style={styles.status}>
-            No dogs yet.
-          </ThemedText>
-        )
-      }
-      ItemSeparatorComponent={() => <View style={styles.separator} />}
-      style={{ backgroundColor: theme.background }}
-      contentContainerStyle={[
-        styles.content,
-        {
-          paddingTop: insets.top + Spacing.four,
-          paddingBottom: insets.bottom + BottomTabInset + Spacing.three,
-        },
-      ]}
-    />
+        }
+        ListEmptyComponent={
+          status === 'loading' ? (
+            <ActivityIndicator color={RED} style={styles.status} />
+          ) : status === 'error' ? (
+            <View style={styles.status}>
+              <Text style={styles.muted}>{error}</Text>
+              <Pressable accessibilityRole="button" onPress={() => refreshDogs()}>
+                <Text style={styles.link}>Try again</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <Text style={[styles.muted, styles.status]}>No dogs yet.</Text>
+          )
+        }
+      />
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  content: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
-    paddingHorizontal: Spacing.four,
-  },
-  header: { gap: Spacing.two, marginBottom: Spacing.four },
-  title: { fontSize: 34, lineHeight: 40, fontWeight: 800 },
-  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.three },
-  rank: { width: 28, fontSize: 20, fontWeight: 800, color: ACCENT, textAlign: 'center' },
-  card: { flex: 1 },
-  separator: { height: Spacing.three },
-  status: { alignItems: 'center', gap: Spacing.two, paddingVertical: Spacing.five },
+  safe: { flex: 1, backgroundColor: '#fff' },
+  content: { paddingHorizontal: 20, paddingTop: 19, paddingBottom: 32, maxWidth: 480, width: '100%', alignSelf: 'center' },
+  header: { marginBottom: 16, gap: 5 },
+  heading: { fontSize: 26, fontWeight: '800', color: '#28242b' },
+  subtitle: { fontSize: 13, color: '#888188' },
+  status: { alignItems: 'center', gap: 8, paddingVertical: 24, textAlign: 'center' },
+  muted: { fontSize: 14, color: '#8b858b' },
+  link: { fontSize: 13, color: RED, fontWeight: '700' },
 });

@@ -165,6 +165,11 @@ export async function likeDog(id: string): Promise<void> {
   }
 }
 
+/** Most-liked first; ties keep the oldest profile first. */
+export function rankByLikes(dogs: Dog[]): Dog[] {
+  return [...dogs].sort((a, b) => b.likes - a.likes || Number(a.id) - Number(b.id));
+}
+
 export function useDogsState(): State {
   return useSyncExternalStore(subscribe, () => state, () => state);
 }

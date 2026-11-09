@@ -10,6 +10,12 @@ import { dogTint, furSwatches, refreshDogs, useDogsState } from '@/lib/dogs-stor
 export default function SearchDogsScreen() {
   const params = useLocalSearchParams<{ q?: string }>();
   const [query, setQuery] = useState(params.q ?? '');
+  // The screen stays mounted between tab visits, so pick up a new ?q= from Home.
+  const [seenParam, setSeenParam] = useState(params.q);
+  if (params.q !== seenParam) {
+    setSeenParam(params.q);
+    if (params.q !== undefined) setQuery(params.q);
+  }
   const { dogs, status, error } = useDogsState();
   const [pulling, setPulling] = useState(false);
   useFocusEffect(

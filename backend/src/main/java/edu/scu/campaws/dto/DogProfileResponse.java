@@ -7,7 +7,6 @@ import java.util.List;
 public record DogProfileResponse(
         int dogId,
         String name,
-        String breed,
         String temperament,
         boolean canBePetted,
         String campusFrequency,
@@ -18,13 +17,15 @@ public record DogProfileResponse(
         String location,
         String about,
         String pettingPolicy,
-        String addedBy
+        String addedBy,
+        /** Last-seen location; both null when unknown. */
+        Double latitude,
+        Double longitude
 ) {
     public static DogProfileResponse from(DogProfile dog) {
         return new DogProfileResponse(
                 dog.getDogId(),
                 dog.getName(),
-                dog.getBreed(),
                 dog.getTemperament(),
                 dog.isCanBePetted(),
                 dog.getCampusFrequency(),
@@ -35,7 +36,9 @@ public record DogProfileResponse(
                 dog.getLocation(),
                 dog.getAbout(),
                 dog.getPettingPolicy(),
-                dog.getAddedBy()
+                dog.getAddedBy(),
+                dog.getLastSeenLatitude(),
+                dog.getLastSeenLongitude()
         );
     }
 }

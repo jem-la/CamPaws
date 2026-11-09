@@ -8,7 +8,6 @@ import java.util.List;
  */
 public record DogProfileRequest(
         String name,
-        String breed,
         String temperament,
         Boolean canBePetted,
         String campusFrequency,
@@ -18,7 +17,10 @@ public record DogProfileRequest(
         String location,
         String about,
         String pettingPolicy,
-        String addedBy
+        String addedBy,
+        /** Where the dog was last seen. Send both, or neither. */
+        Double latitude,
+        Double longitude
 ) {
     /** Photos to save: {@code photoUrls} when given, otherwise the single {@code photoUrl}. */
     public List<String> resolvedPhotoUrls() {

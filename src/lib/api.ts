@@ -75,7 +75,6 @@ const json = (method: string, body: unknown): RequestInit => ({
 export type DogProfileDto = {
   dogId: number;
   name: string;
-  breed: string | null;
   temperament: string | null;
   canBePetted: boolean;
   campusFrequency: string | null;
@@ -87,6 +86,9 @@ export type DogProfileDto = {
   about: string | null;
   pettingPolicy: 'ask' | 'yes' | 'no' | null;
   addedBy: string | null;
+  /** Last-seen location (PostGIS-backed). Both null when unknown. */
+  latitude: number | null;
+  longitude: number | null;
 };
 
 /** Mirrors backend DogProfileRequest. */
@@ -101,10 +103,18 @@ export type DogProfileRequestDto = {
   pettingPolicy: 'ask' | 'yes' | 'no';
   canBePetted: boolean;
   addedBy?: string;
+  /** Send both or neither. On update, omitting them keeps the saved location. */
+  latitude?: number;
+  longitude?: number;
 };
 
 export const api = {
   listDogs: (q?: string) => request<DogProfileDto[]>(`/api/dogs${q ? `?q=${encodeURIComponent(q)}` : ''}`),
+  /** Dogs last seen within radiusMeters (default 1 km) of a point, closest first. */
+  nearbyDogs: (lat: number, lng: number, radiusMeters = 1000) =>
+    request<DogProfileDto[]>(
+      `/api/dogs/nearby?${new URLSearchParams({ lat: String(lat), lng: String(lng), radiusMeters: String(radiusMeters) })}`,
+    ),
   getDog: (id: string) => request<DogProfileDto>(`/api/dogs/${encodeURIComponent(id)}`),
   createDog: (body: DogProfileRequestDto) => request<DogProfileDto>('/api/dogs', json('POST', body)),
   updateDog: (id: string, body: DogProfileRequestDto) =>

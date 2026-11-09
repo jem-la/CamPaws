@@ -1,56 +1,106 @@
-# Welcome to your Expo app 👋
+# CamPaws 🐾
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+Find, like and share the dogs of Santa Clara University.
 
-## Get started
+- **App:** Expo / React Native (`src/`), runs on web, iOS and Android
+- **Backend:** Spring Boot REST API (`backend/`) on port 8080
+- **Database:** PostgreSQL 17 + PostGIS (dog locations), run with Docker
 
-1. Install dependencies
+## 1. Install these once
 
-   ```bash
-   npm install
-   ```
+| Tool | Version | Get it |
+|---|---|---|
+| Git | any | https://git-scm.com |
+| Node.js | current LTS (22 or 24) | https://nodejs.org |
+| JDK | **17** (exactly; the build asks for Java 17) | https://adoptium.net (Temurin 17), or `brew install --cask temurin@17` |
+| Docker Desktop | any recent | https://www.docker.com/products/docker-desktop |
 
-2. Start the app
+You don't need to install Gradle, Expo, PostgreSQL or PostGIS yourself. The Gradle wrapper,
+`npm install` and Docker handle them.
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **src/app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## 2. Get the code
 
 ```bash
-npm run reset-project
+git clone https://github.com/jem-la/CamPaws.git
+cd CamPaws
+npm install
 ```
 
-This command will move the starter code to the **example** directory and create a blank **src/app** directory where you can start developing.
+## 3. Run it (two terminals)
 
-### Other setup steps
+Make sure **Docker Desktop is running** first.
 
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
+**Terminal 1: backend + database**
 
-## Learn more
+```bash
+cd backend
+./gradlew bootRun          # Windows: gradlew.bat bootRun
+```
 
-To learn more about developing your project with Expo, look at the following resources:
+This starts the PostGIS database from `backend/compose.yaml` automatically, creates the tables,
+and adds 11 sample dogs the first time. The first run downloads a lot, so give it a few minutes.
+It's ready when http://localhost:8080/api/dogs shows a list of dogs.
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+**Terminal 2: app**
 
-## Join the community
+```bash
+npx expo start
+```
 
-Join our community of developers creating universal apps.
+- Press **`w`** to open the website (http://localhost:8081).
+- Or scan the QR code with the **Expo Go** app on your phone (phone and computer on the same Wi-Fi).
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+To stop, press `Ctrl+C` in both terminals. The database container keeps running in the background
+so the next start is quick; stop it with `cd backend && docker compose down`.
+
+## Data
+
+- Dogs, their photo URLs and likes are stored in PostgreSQL in the Docker volume `backend_campaws-db`,
+  so they survive restarts.
+- Each dog's last-seen spot is stored as latitude/longitude plus a PostGIS `geography` point
+  (`last_seen_point`) used for "dogs near me" searches.
+- Schema: `backend/src/main/resources/db/migration/` (Flyway, applied automatically on startup).
+- Sample dogs: `backend/src/main/java/edu/scu/campaws/service/SampleDogSeeder.java`
+  (only added when the database is empty).
+- Uploaded photo files: `backend/uploads/` (not committed to git).
+- **Reset everything** to the sample data: `cd backend && docker compose down -v`, then run the backend again.
+
+Look inside the database:
+
+```bash
+cd backend
+docker compose exec db psql -U campaws -d campaws -c "select dog_id, name, like_count from dogs;"
+```
+
+## API quick reference
+
+| Method | Path | What it does |
+|---|---|---|
+| GET | `/api/dogs?q=&canBePetted=` | list / search dogs |
+| GET | `/api/dogs/{id}` | one dog |
+| GET | `/api/dogs/leaderboard` | most liked first |
+| GET | `/api/dogs/nearby?lat=&lng=&radiusMeters=1000` | dogs near a point, closest first (max 50 km) |
+| POST | `/api/dogs` | create (`name`, `photoUrls` required; `latitude`/`longitude` optional) |
+| PUT | `/api/dogs/{id}` | update (omit `latitude`/`longitude` to keep the saved location) |
+| POST | `/api/dogs/{id}/likes` | add a like |
+| POST | `/api/photos` | upload a photo (multipart `file`) |
+
+## Checks
+
+```bash
+cd backend && ./gradlew test     # backend tests; database tests are skipped if Docker isn't running
+npx tsc --noEmit                 # app typecheck
+npx expo lint                    # app lint
+```
+
+## Troubleshooting
+
+- **`Cannot connect to the Docker daemon`**: start Docker Desktop and try again.
+- **Port 55432 already in use**: pick another port, e.g. `CAMPAWS_DB_PORT=55433 ./gradlew bootRun`.
+- **Port 8080 already in use**: `PORT=8090 ./gradlew bootRun`, and start the app with
+  `EXPO_PUBLIC_API_URL=http://localhost:8090 npx expo start`.
+- **`Toolchain ... languageVersion=17` not found**: install JDK 17 (see step 1).
+- **App says "Can't reach the CamPaws server" on a phone**: start Expo with your computer's IP,
+  e.g. `EXPO_PUBLIC_API_URL=http://192.168.1.20:8080 npx expo start`.
+- **Using your own Postgres instead of Docker**: it needs the PostGIS extension. Set
+  `DATABASE_URL=jdbc:postgresql://host:port/db`, `DATABASE_USERNAME` and `DATABASE_PASSWORD`.

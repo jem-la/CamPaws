@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 const items = [
   { name: 'home', href: '/', label: 'Home', icon: '⌂' },
   { name: 'leaderboard', href: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
-  { name: 'search', href: '/feed', label: 'Search Dogs', icon: '⌕' },
+  { name: 'search', href: '/explore', label: 'Search Dogs', icon: '⌕' },
   { name: 'dogs', href: '/my-dogs', label: 'My Dogs', icon: '🐾' },
   { name: 'profile', href: '/profile', label: 'Profile', icon: '♙' },
 ] as const;
@@ -22,6 +22,8 @@ export default function AppTabs() {
               key={item.name}
               name={item.name}
               href={item.href}
+              // Tapping a tab always opens its main screen (e.g. the search list, not an old profile).
+              resetOnFocus
               asChild
             >
               <TabButton icon={item.icon} label={item.label} />

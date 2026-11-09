@@ -1,5 +1,8 @@
 import { Stack } from 'expo-router';
 
+// Deep links (or a page reload) to a dog profile still get the search list underneath for Back.
+export const unstable_settings = { anchor: 'index' };
+
 export default function SearchDogsLayout() {
   return (
     <Stack

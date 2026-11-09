@@ -48,10 +48,14 @@ export default function DogProfileScreen() {
           <ScrollView
             horizontal
             pagingEnabled
+            style={{ width: photoWidth }}
             showsHorizontalScrollIndicator={false}
             onMomentumScrollEnd={(e) => setPhotoIndex(Math.round(e.nativeEvent.contentOffset.x / photoWidth))}>
             {dog.photos.map((uri, i) => (
-              <Image key={`${i}-${uri}`} source={{ uri }} style={{ width: photoWidth, height: 230 }} contentFit="cover" />
+              // Fixed-size wrapper: on web expo-image shrinks to fit the row otherwise.
+              <View key={`${i}-${uri}`} style={{ width: photoWidth, height: 230 }}>
+                <Image source={{ uri }} style={StyleSheet.absoluteFill} contentFit="cover" />
+              </View>
             ))}
           </ScrollView>
         )}
