@@ -1,5 +1,10 @@
 package edu.scu.campaws.domain;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Set;
+
 public class DogProfile {
     private final int dogId;
     private String name;
@@ -11,6 +16,15 @@ public class DogProfile {
     private final float lastSeenLongitude;
     private int likeCount;
     private String photoUrl;
+    private List<String> photoUrls = List.of();
+    private String furColor;
+    private String location;
+    private String about;
+    private String pettingPolicy;
+    private String addedBy;
+
+    public static final int MAX_PHOTOS = 5;
+    private static final Set<String> PETTING_POLICIES = Set.of("ask", "yes", "no");
 
     public DogProfile(
             int dogId,
@@ -40,6 +54,35 @@ public class DogProfile {
         this.lastSeenLatitude = lastSeenLatitude;
         this.lastSeenLongitude = lastSeenLongitude;
         this.likeCount = 0;
+        this.pettingPolicy = canBePetted ? "yes" : "ask";
+    }
+
+    /**
+     * Sets the descriptive fields shown on the profile page. All are optional.
+     * {@code pettingPolicy} is one of "ask", "yes" or "no"; null keeps it derived from canBePetted.
+     */
+    public void inputAppearance(
+            String furColor,
+            String location,
+            String about,
+            String pettingPolicy) {
+
+        this.furColor = normalizeOptional(furColor);
+        this.location = normalizeOptional(location);
+        this.about = normalizeOptional(about);
+
+        if (pettingPolicy != null && !pettingPolicy.isBlank()) {
+            String policy = pettingPolicy.trim().toLowerCase(Locale.ROOT);
+            if (!PETTING_POLICIES.contains(policy)) {
+                throw new IllegalArgumentException(
+                        "Petting policy must be one of ask, yes or no."
+                );
+            }
+            this.pettingPolicy = policy;
+            this.canBePetted = policy.equals("yes");
+        } else {
+            this.pettingPolicy = canBePetted ? "yes" : "ask";
+        }
     }
 
     public void inputDetails(
@@ -118,6 +161,61 @@ public class DogProfile {
     }
 
     public void setPhotoUrl(String photoUrl) {
+        setPhotoUrls(photoUrl == null ? null : List.of(photoUrl));
+    }
+
+    /** Replaces the dog's photos. The first URL becomes the profile photo. */
+    public void setPhotoUrls(List<String> photoUrls) {
+        if (photoUrls == null || photoUrls.isEmpty()) {
+            throw new IllegalArgumentException(
+                    "At least one dog photo URL is required."
+            );
+        }
+
+        if (photoUrls.size() > MAX_PHOTOS) {
+            throw new IllegalArgumentException(
+                    "A dog profile can have at most " + MAX_PHOTOS + " photos."
+            );
+        }
+
+        List<String> normalized = new ArrayList<>();
+        for (String url : photoUrls) {
+            normalized.add(normalizePhotoUrl(url));
+        }
+
+        this.photoUrls = List.copyOf(normalized);
+        this.photoUrl = normalized.get(0);
+    }
+
+    public List<String> getPhotoUrls() {
+        return photoUrls;
+    }
+
+    public String getFurColor() {
+        return furColor;
+    }
+
+    public String getLocation() {
+        return location;
+    }
+
+    public String getAbout() {
+        return about;
+    }
+
+    public String getPettingPolicy() {
+        return pettingPolicy;
+    }
+
+    public String getAddedBy() {
+        return addedBy;
+    }
+
+    public void setAddedBy(String addedBy) {
+        this.addedBy = normalizeOptional(addedBy);
+    }
+
+    private static String normalizePhotoUrl(String photoUrl) {
         if (photoUrl == null || photoUrl.isBlank()) {
             throw new IllegalArgumentException(
                     "At least one dog photo URL is required."
@@ -135,7 +233,7 @@ public class DogProfile {
             );
         }
 
-        this.photoUrl = normalized;
+        return normalized;
     }
 
     private static void validateName(String name) {

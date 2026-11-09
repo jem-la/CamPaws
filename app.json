@@ -33,7 +33,15 @@
           "imageWidth": 76
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "CamPaws uses your photos so you can add pictures to dog profiles.",
+          "cameraPermission": "CamPaws uses the camera so you can photograph dogs you meet on campus.",
+          "microphonePermission": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
