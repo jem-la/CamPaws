@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -45,7 +45,7 @@ export default function HomeScreen() {
   );
 }
 const styles = StyleSheet.create({
-  safe:{flex:1,backgroundColor:'#fff'},scroll:{flex:1},content:{paddingHorizontal:20,paddingTop:19,paddingBottom:32,maxWidth:520,width:'100%',alignSelf:'center'},
+  safe:{flex:1,backgroundColor:'#fff'},scroll:{flex:1},content:{paddingHorizontal:20,paddingTop:19,paddingBottom:26,maxWidth:390,width:'100%',alignSelf:'center'},
   heading:{fontSize:26,fontWeight:'800',color:'#28242b'},subtitle:{fontSize:12,color:'#888188',marginTop:5,marginBottom:21},
   search:{height:43,borderWidth:1,borderColor:'#eee7e8',backgroundColor:'#fcfafb',borderRadius:12,flexDirection:'row',alignItems:'center',paddingHorizontal:13,marginBottom:15},searchIcon:{fontSize:24,color:'#8d858b',marginRight:9},input:{flex:1,fontSize:12,color:'#2c292d',height:'100%'},camera:{fontSize:20,color:RED},
   activity:{borderWidth:1,borderColor:'#eee8e9',borderRadius:16,overflow:'hidden'},activityHeader:{paddingHorizontal:13,paddingTop:12,paddingBottom:8},sectionSmall:{fontSize:14,fontWeight:'700',color:'#29262b'},muted:{fontSize:9,color:'#9b949a',marginTop:3},map:{height:112,backgroundColor:'#f3f5f6',overflow:'hidden',position:'relative'},road:{position:'absolute',height:10,backgroundColor:'#fff',borderRadius:10},grass:{position:'absolute',width:47,height:17,borderRadius:20,backgroundColor:'#e0ecd9'},mapLabel:{position:'absolute',backgroundColor:'#fff',borderRadius:4,paddingHorizontal:5,paddingVertical:2},mapLabelText:{fontSize:8,color:'#49444a',fontWeight:'600'},pin:{position:'absolute',width:24,height:24,borderRadius:12,backgroundColor:RED,justifyContent:'center',alignItems:'center'},pinText:{color:'#fff',fontWeight:'700',fontSize:11},mapFooter:{minHeight:57,flexDirection:'row',alignItems:'center',justifyContent:'space-between',paddingHorizontal:13,paddingVertical:7},mapBold:{fontSize:10,fontWeight:'700',color:'#383138'},arrow:{fontSize:24,color:RED},
