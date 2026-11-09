@@ -15,17 +15,29 @@ export type DogProfile = {
   photo?: ImageSource;
   /** background behind the photo, also used as the placeholder when there is no photo */
   tint: string;
+  likeCount?: number;
+  canBePetted?: boolean;
+  temperament?: string;
 };
 
 type DogProfileCardProps = {
   dog: DogProfile;
   accentColor: string;
   onPress?: () => void;
+  /** Called when the heart is pressed. Should resolve once the like is saved. */
+  onLike?: (dog: DogProfile) => Promise<unknown> | void;
 };
 
-export function DogProfileCard({ dog, accentColor, onPress }: DogProfileCardProps) {
+export function DogProfileCard({ dog, accentColor, onPress, onLike }: DogProfileCardProps) {
   const theme = useTheme();
+  // The backend only supports liking (no unlike), so the heart stays filled once liked.
   const [favorited, setFavorited] = useState(false);
+
+  const handleLike = () => {
+    if (favorited) return;
+    setFavorited(true);
+    Promise.resolve(onLike?.(dog)).catch(() => setFavorited(false));
+  };
 
   return (
     <Pressable
@@ -67,8 +79,8 @@ export function DogProfileCard({ dog, accentColor, onPress }: DogProfileCardProp
       <Pressable
         hitSlop={12}
         accessibilityRole="button"
-        accessibilityLabel={favorited ? `Unfavorite ${dog.name}` : `Favorite ${dog.name}`}
-        onPress={() => setFavorited((value) => !value)}
+        accessibilityLabel={favorited ? `Liked ${dog.name}` : `Like ${dog.name}`}
+        onPress={handleLike}
         style={styles.favorite}>
         <SymbolView
           name={{
@@ -79,6 +91,11 @@ export function DogProfileCard({ dog, accentColor, onPress }: DogProfileCardProp
           tintColor={accentColor}
           size={22}
         />
+        {dog.likeCount !== undefined && (
+          <ThemedText type="small" themeColor="textSecondary" style={styles.likeCount}>
+            {dog.likeCount + (favorited ? 1 : 0)}
+          </ThemedText>
+        )}
       </Pressable>
     </Pressable>
   );
@@ -125,6 +142,11 @@ const styles = StyleSheet.create({
   },
   favorite: {
     alignSelf: 'flex-start',
+    alignItems: 'center',
     padding: Spacing.one,
+  },
+  likeCount: {
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

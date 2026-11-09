@@ -6,7 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 const ITEMS = [
   { route: '/', name: 'Home', icon: '⌂' },
   { route: '/leaderboard', name: 'Leaderboard', icon: '🏆' },
-  { route: '/explore', name: 'Search Dogs', icon: '⌕' },
+  { route: '/feed', name: 'Search Dogs', icon: '⌕' },
   { route: '/my-dogs', name: 'My Dogs', icon: '🐾' },
   { route: '/profile', name: 'Profile', icon: '♙' },
 ] as const;
@@ -42,7 +42,7 @@ export default function AppTabs() {
         <NativeTabs.Trigger.Icon src={require('@/assets/images/tabIcons/home.png')} renderingMode="template" />
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="leaderboard"><NativeTabs.Trigger.Label>Leaderboard</NativeTabs.Trigger.Label></NativeTabs.Trigger>
-      <NativeTabs.Trigger name="explore">
+      <NativeTabs.Trigger name="feed">
         <NativeTabs.Trigger.Label>Search Dogs</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon src={require('@/assets/images/tabIcons/explore.png')} renderingMode="template" />
       </NativeTabs.Trigger>

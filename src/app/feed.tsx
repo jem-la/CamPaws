@@ -1,8 +1,9 @@
 import { SymbolView } from 'expo-symbols';
-import { useState } from 'react';
-import { FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { fetchDogs, likeDog } from '@/api/dogs';
 import { DogProfileCard, type DogProfile } from '@/components/dog-profile-card';
 import { ThemedText } from '@/components/themed-text';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
@@ -11,20 +12,46 @@ import { useTheme } from '@/hooks/use-theme';
 const ACCENT = '#C8102E';
 const ACCENT_SOFT = 'rgba(200, 16, 46, 0.1)';
 
-const FILTERS = ['All dogs', 'Nearby', 'Friendly'] as const;
-
-// Placeholder data until the feed is wired to the backend.
-const DOGS: DogProfile[] = [
-  { id: '1', name: 'Mochi', breed: 'Corgi', location: 'Library lawn', tint: '#F8E3D8' },
-  { id: '2', name: 'Luna', breed: 'Golden retriever', location: 'Benson Center', tint: '#F3E6CC' },
-  { id: '3', name: 'Pepper', breed: 'Dalmatian', location: 'Mission Gardens', tint: '#E4E8F0' },
-];
+// "Nearby" is not offered yet: the backend has no per-dog location to filter on.
+const FILTERS = ['All dogs', 'Friendly'] as const;
 
 export default function FeedScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  // Filters are visual only for now; selecting one does not change the list.
   const [activeFilter, setActiveFilter] = useState<(typeof FILTERS)[number]>('All dogs');
+  const [search, setSearch] = useState('');
+  const [dogs, setDogs] = useState<DogProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    // Debounce typing so we don't call the backend on every keystroke.
+    const timer = setTimeout(() => {
+      setLoading(true);
+      setError(null);
+      fetchDogs(
+        {
+          q: search.trim() || undefined,
+          canBePetted: activeFilter === 'Friendly' ? true : undefined,
+        },
+        controller.signal
+      )
+        .then(setDogs)
+        .catch((e) => {
+          if (e instanceof Error && e.name === 'AbortError') return;
+          setError(e instanceof Error ? e.message : 'Something went wrong.');
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setLoading(false);
+        });
+    }, 300);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search, activeFilter, reloadKey]);
 
   const header = (
     <View style={styles.header}>
@@ -47,6 +74,9 @@ export default function FeedScreen() {
           placeholder="Search dogs by name"
           placeholderTextColor={theme.textSecondary}
           style={[styles.searchInput, { color: theme.text }]}
+          value={search}
+          onChangeText={setSearch}
+          autoCorrect={false}
           returnKeyType="search"
         />
         <Pressable hitSlop={8} accessibilityRole="button" accessibilityLabel="Search by photo">
@@ -95,7 +125,7 @@ export default function FeedScreen() {
       <View style={styles.sectionHeader}>
         <ThemedText style={styles.sectionTitle}>Around campus</ThemedText>
         <ThemedText type="small" themeColor="textSecondary">
-          {DOGS.length} dogs
+          {dogs.length} dogs
         </ThemedText>
       </View>
     </View>
@@ -103,10 +133,30 @@ export default function FeedScreen() {
 
   return (
     <FlatList
-      data={DOGS}
+      data={dogs}
       keyExtractor={(dog) => dog.id}
-      renderItem={({ item }) => <DogProfileCard dog={item} accentColor={ACCENT} />}
+      renderItem={({ item }) => (
+        <DogProfileCard dog={item} accentColor={ACCENT} onLike={(dog) => likeDog(dog.id)} />
+      )}
       ListHeaderComponent={header}
+      ListEmptyComponent={
+        loading ? (
+          <ActivityIndicator color={ACCENT} style={styles.status} />
+        ) : error ? (
+          <View style={styles.status}>
+            <ThemedText themeColor="textSecondary">{error}</ThemedText>
+            <Pressable onPress={() => setReloadKey((k) => k + 1)} accessibilityRole="button">
+              <ThemedText type="smallBold" style={{ color: ACCENT }}>
+                Try again
+              </ThemedText>
+            </Pressable>
+          </View>
+        ) : (
+          <ThemedText themeColor="textSecondary" style={styles.status}>
+            No dogs found.
+          </ThemedText>
+        )
+      }
       ListFooterComponent={
         <ThemedText type="small" themeColor="textSecondary" style={styles.footer}>
           Looking for a familiar face? Try photo search.
@@ -192,6 +242,11 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: Spacing.three,
+  },
+  status: {
+    alignItems: 'center',
+    gap: Spacing.two,
+    paddingVertical: Spacing.five,
   },
   footer: {
     marginTop: Spacing.five,

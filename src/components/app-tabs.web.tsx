@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 const items = [
   { name: 'home', href: '/', label: 'Home', icon: '⌂' },
   { name: 'leaderboard', href: '/leaderboard', label: 'Leaderboard', icon: '🏆' },
-  { name: 'search', href: '/explore', label: 'Search Dogs', icon: '⌕' },
+  { name: 'search', href: '/feed', label: 'Search Dogs', icon: '⌕' },
   { name: 'dogs', href: '/my-dogs', label: 'My Dogs', icon: '🐾' },
   { name: 'profile', href: '/profile', label: 'Profile', icon: '♙' },
 ] as const;
