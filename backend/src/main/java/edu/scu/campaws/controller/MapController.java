@@ -18,7 +18,7 @@ public class MapController {
 
 
     @GetMapping("/dogs")
-    public List<MapMarkerResponse> getAnonymousDogMarkers() {
-        return sessions.getPublicMarkers();
+    public List<MapMarkerResponse> markers() {
+        return sessions.markers();
     }
 }

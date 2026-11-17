@@ -10,8 +10,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,7 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 @Service
 public class WalkSessionService {
-    static final Duration PUBLIC_LOCATION_MAX_AGE =
+    static final Duration MAX_AGE =
             Duration.ofMinutes(5);
 
     private static final String PUBLIC_LABEL = "Dog nearby";
@@ -77,6 +75,7 @@ public class WalkSessionService {
     }
 
     public StartWalkResponse startWalk(
+            int userId,
             int dogId,
             boolean publicSharing,
             Double latitude,
@@ -115,14 +114,11 @@ public class WalkSessionService {
                 LocalDateTime.ofInstant(now, ZoneOffset.UTC)
         );
 
-        String token =
-                UUID.randomUUID() + "." + UUID.randomUUID();
-
         Session session = new Session(
                 id,
                 dogId,
                 walk,
-                token,
+                userId,
                 UUID.randomUUID().toString(),
                 publicSharing,
                 acceptedLatitude,
@@ -137,18 +133,18 @@ public class WalkSessionService {
                 : "Private walk started; no coordinates are retained or shown on the public map.";
 
         return new StartWalkResponse(
-                id, token, publicSharing, message
+                id, publicSharing, message
         );
     }
 
     public void updateLocation(
             int walkId,
-            String token,
+            int userId,
             Double latitude,
             Double longitude) {
 
         Session session = requireSession(walkId);
-        authorize(session, token);
+        checkOwner(session, userId);
 
         synchronized (session) {
             if (!session.walk.isActive()) {
@@ -177,9 +173,9 @@ public class WalkSessionService {
         }
     }
 
-    public void endWalk(int walkId, String token) {
+    public void endWalk(int walkId, int userId) {
         Session session = requireSession(walkId);
-        authorize(session, token);
+        checkOwner(session, userId);
 
         synchronized (session) {
             if (!session.walk.isActive()) {
@@ -201,8 +197,8 @@ public class WalkSessionService {
         }
     }
 
-    public List<MapMarkerResponse> getPublicMarkers() {
-        expireStalePublicLocations();
+    public List<MapMarkerResponse> markers() {
+        expireOld();
 
         List<MapMarkerResponse> markers = new ArrayList<>();
 
@@ -246,9 +242,9 @@ public class WalkSessionService {
             fixedDelayString =
                     "${campaws.map.cleanup-interval-ms:30000}"
     )
-    public void expireStalePublicLocations() {
+    public void expireOld() {
         Instant cutoff =
-                clock.instant().minus(PUBLIC_LOCATION_MAX_AGE);
+                clock.instant().minus(MAX_AGE);
 
         for (Session session : sessions.values()) {
             synchronized (session) {
@@ -277,25 +273,9 @@ public class WalkSessionService {
         return session;
     }
 
-    private void authorize(
-            Session session, String suppliedToken) {
-
-        if (suppliedToken == null || suppliedToken.isBlank()) {
-            throw new SecurityException(
-                    "A valid X-Walk-Token header is required."
-            );
-        }
-
-        byte[] expected =
-                session.shareToken.getBytes(StandardCharsets.UTF_8);
-
-        byte[] supplied =
-                suppliedToken.getBytes(StandardCharsets.UTF_8);
-
-        if (!MessageDigest.isEqual(expected, supplied)) {
-            throw new SecurityException(
-                    "The walk token is invalid."
-            );
+    private void checkOwner(Session session, int userId) {
+        if (session.userId != userId) {
+            throw new SecurityException("This is not your walk.");
         }
     }
 
@@ -320,7 +300,7 @@ public class WalkSessionService {
         private final int dogId;
 
         private final Walk walk;
-        private final String shareToken;
+        private final int userId;
         private final String publicMarkerId;
 
         private boolean publicSharing;
@@ -332,7 +312,7 @@ public class WalkSessionService {
                 int walkId,
                 int dogId,
                 Walk walk,
-                String shareToken,
+                int userId,
                 String publicMarkerId,
                 boolean publicSharing,
                 Double latitude,
@@ -342,7 +322,7 @@ public class WalkSessionService {
             this.walkId = walkId;
             this.dogId = dogId;
             this.walk = walk;
-            this.shareToken = shareToken;
+            this.userId = userId;
             this.publicMarkerId = publicMarkerId;
             this.publicSharing = publicSharing;
             this.latitude = latitude;

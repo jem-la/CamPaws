@@ -1,6 +1,7 @@
 package edu.scu.campaws.controller;
 
 import edu.scu.campaws.dto.PhotoUploadResponse;
+import edu.scu.campaws.service.AuthService;
 import edu.scu.campaws.service.PhotoStorage;
 
 import org.springframework.core.io.FileSystemResource;
@@ -22,9 +23,11 @@ import java.time.Duration;
 @RequestMapping("/api/photos")
 public class PhotoController {
     private final PhotoStorage storage;
+    private final AuthService auth;
 
-    public PhotoController(PhotoStorage storage) {
+    public PhotoController(PhotoStorage storage, AuthService auth) {
         this.storage = storage;
+        this.auth = auth;
     }
 
     /**
@@ -34,7 +37,10 @@ public class PhotoController {
      */
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
-    public PhotoUploadResponse upload(@RequestParam("file") MultipartFile file) throws IOException {
+    public PhotoUploadResponse upload(
+            @RequestHeader(name = "Authorization", required = false) String authorization,
+            @RequestParam("file") MultipartFile file) throws IOException {
+        auth.currentUser(authorization);
         String name = storage.store(file);
         String url = ServletUriComponentsBuilder.fromCurrentContextPath()
                 .path("/api/photos/{name}")

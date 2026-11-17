@@ -21,7 +21,6 @@ import static org.junit.jupiter.api.Assertions.*;
 @Import(PostgisTestDatabase.class)
 @Testcontainers(disabledWithoutDocker = true)
 class DogCatalogTest {
-    // Santa Clara University, and a point about 70 km away in San Francisco.
     private static final double SCU_LAT = 37.3496, SCU_LON = -121.9390;
     private static final double SF_LAT = 37.7749, SF_LON = -122.4194;
 
@@ -36,12 +35,12 @@ class DogCatalogTest {
         repository.deleteAll();
     }
 
-    /** Creates and stores a dog with one photo, optionally at a location. */
+
     private DogProfile store(String name, boolean pet, Double lat, Double lon) {
-        DogProfile dog = catalog.newDogProfile(name, "Friendly", pet, "Daily");
+        DogProfile dog = catalog.newDog(name, "Friendly", pet, "Daily");
         dog.setPhotoUrl("https://images.example/" + name + ".jpg");
         dog.setLastSeenLocation(lat, lon);
-        return catalog.createDogProfile(dog);
+        return catalog.addDog(dog);
     }
 
     private DogProfile store(String name, boolean pet) {
@@ -56,13 +55,13 @@ class DogCatalogTest {
 
     @Test
     void savedFieldsSurviveAReload() {
-        DogProfile dog = catalog.newDogProfile(" Mochi ", "Calm", false, "Every day");
+        DogProfile dog = catalog.newDog(" Mochi ", "Calm", false, "Every day");
         dog.inputAppearance("Tan and white", "Library lawn", "Naps a lot", "ask");
         dog.setPhotoUrls(List.of("https://x.test/a.jpg", "https://x.test/b.jpg"));
         dog.setLastSeenLocation(SCU_LAT, SCU_LON);
         dog.setAddedBy("Alex Lee");
         dog.addLike();
-        catalog.createDogProfile(dog);
+        catalog.addDog(dog);
 
         DogProfile loaded = catalog.requireById(dog.getDogId());
         assertEquals("Mochi", loaded.getName());
@@ -155,7 +154,7 @@ class DogCatalogTest {
         catalog.likeDog(max.getDogId());
         catalog.likeDog(luna.getDogId());
 
-        List<DogProfile> board = catalog.viewLeaderboard();
+        List<DogProfile> board = catalog.leaderboard();
         assertEquals("Max", board.get(0).getName());
         assertEquals(2, board.get(0).getLikeCount());
         assertEquals(1, board.get(1).getLikeCount());
@@ -170,8 +169,8 @@ class DogCatalogTest {
 
     @Test
     void autoAssignsIncreasingIds() {
-        DogProfile a = catalog.createDogProfile("Luna", "Friendly", true, "Daily");
-        DogProfile b = catalog.createDogProfile("Max", "Calm", false, "Weekly");
+        DogProfile a = catalog.addDog("Luna", "Friendly", true, "Daily");
+        DogProfile b = catalog.addDog("Max", "Calm", false, "Weekly");
         assertTrue(a.getDogId() > 0);
         assertEquals(a.getDogId() + 1, b.getDogId());
     }
@@ -181,7 +180,7 @@ class DogCatalogTest {
         DogProfile luna = store("Luna", true);
         DogProfile copy = new DogProfile(luna.getDogId(), "Max", "Calm", true, "Daily");
         copy.setPhotoUrl("https://x.test/max.jpg");
-        assertThrows(IllegalArgumentException.class, () -> catalog.createDogProfile(copy));
+        assertThrows(IllegalArgumentException.class, () -> catalog.addDog(copy));
     }
 
     @Test
@@ -192,17 +191,17 @@ class DogCatalogTest {
 
     @Test
     void findsDuplicatesByNameAndCompatibleFurColor() {
-        DogProfile mochi = catalog.newDogProfile("Mochi", null, false, null);
+        DogProfile mochi = catalog.newDog("Mochi", null, false, null);
         mochi.inputAppearance("Tan and white", null, null, null);
         mochi.setPhotoUrl("https://x.test/mochi.jpg");
-        catalog.createDogProfile(mochi);
+        catalog.addDog(mochi);
         store("Luna", false);
 
-        assertEquals(List.of(mochi.getDogId()), ids(catalog.findPossibleDuplicates(" mochi ", null, null)));
-        assertEquals(List.of(mochi.getDogId()), ids(catalog.findPossibleDuplicates("Mochi", "tan and white", null)));
-        assertTrue(catalog.findPossibleDuplicates("Mochi", "Black", null).isEmpty());
-        assertTrue(catalog.findPossibleDuplicates("Mochi", null, mochi.getDogId()).isEmpty());
-        assertTrue(catalog.findPossibleDuplicates(" ", null, null).isEmpty());
+        assertEquals(List.of(mochi.getDogId()), ids(catalog.findDuplicates(" mochi ", null, null)));
+        assertEquals(List.of(mochi.getDogId()), ids(catalog.findDuplicates("Mochi", "tan and white", null)));
+        assertTrue(catalog.findDuplicates("Mochi", "Black", null).isEmpty());
+        assertTrue(catalog.findDuplicates("Mochi", null, mochi.getDogId()).isEmpty());
+        assertTrue(catalog.findDuplicates(" ", null, null).isEmpty());
     }
 
     private static List<Integer> ids(List<DogProfile> dogs) {

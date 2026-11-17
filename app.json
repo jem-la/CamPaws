@@ -33,7 +33,6 @@
           "imageWidth": 76
         }
       ],
-      "expo-web-browser",
       "expo-image",
       [
         "expo-image-picker",
@@ -43,7 +42,14 @@
           "microphonePermission": false
         }
       ],
-      "expo-status-bar"
+      "expo-status-bar",
+      "expo-secure-store",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "CamPaws uses your location to show dogs near you and to track your walks."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

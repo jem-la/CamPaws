@@ -4,7 +4,10 @@ import edu.scu.campaws.domain.DogProfile;
 import edu.scu.campaws.domain.Photo;
 import edu.scu.campaws.dto.DogProfileRequest;
 import edu.scu.campaws.dto.DogProfileResponse;
+import edu.scu.campaws.domain.UserAccount;
+import edu.scu.campaws.service.AuthService;
 import edu.scu.campaws.service.DogCatalog;
+import edu.scu.campaws.service.LikeService;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
@@ -15,9 +18,13 @@ import java.util.List;
 @RequestMapping("/api/dogs")
 public class DogController {
     private final DogCatalog catalog;
+    private final AuthService auth;
+    private final LikeService likes;
 
-    public DogController(DogCatalog catalog) {
+    public DogController(DogCatalog catalog, AuthService auth, LikeService likes) {
         this.catalog = catalog;
+        this.auth = auth;
+        this.likes = likes;
     }
 
     @GetMapping
@@ -33,7 +40,7 @@ public class DogController {
 
     @GetMapping("/leaderboard")
     public List<DogProfileResponse> leaderboard() {
-        return catalog.viewLeaderboard()
+        return catalog.leaderboard()
                 .stream()
                 .map(DogProfileResponse::from)
                 .toList();
@@ -59,7 +66,7 @@ public class DogController {
             @RequestParam(required = false) String furColor,
             @RequestParam(required = false) Integer ignoreDogId) {
 
-        return catalog.findPossibleDuplicates(name, furColor, ignoreDogId)
+        return catalog.findDuplicates(name, furColor, ignoreDogId)
                 .stream()
                 .map(DogProfileResponse::from)
                 .toList();
@@ -76,13 +83,15 @@ public class DogController {
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public DogProfileResponse createDog(
+            @RequestHeader(name = "Authorization", required = false) String authorization,
             @RequestBody DogProfileRequest request) {
 
+        UserAccount user = auth.currentUser(authorization);
         validateRequest(request);
-        List<String> photoUrls = validatedPhotoUrls(request);
+        List<String> photoUrls = checkPhotos(request);
 
         // Build and validate the whole profile first; it is only stored once everything is valid.
-        DogProfile profile = catalog.newDogProfile(
+        DogProfile profile = catalog.newDog(
                 request.name(),
                 request.temperament(),
                 Boolean.TRUE.equals(request.canBePetted()),
@@ -91,21 +100,27 @@ public class DogController {
 
         applyDetails(profile, request, photoUrls);
         profile.setLastSeenLocation(request.latitude(), request.longitude());
-        profile.setAddedBy(request.addedBy());
+        profile.setAddedBy(user.getDisplayName());
+        profile.setOwnerId(user.getUserId());
 
-        return DogProfileResponse.from(catalog.createDogProfile(profile));
+        return DogProfileResponse.from(catalog.addDog(profile));
     }
 
     /** Updates a profile. Omitting latitude/longitude keeps the current location. */
     @PutMapping("/{dogId}")
     public DogProfileResponse updateDog(
+            @RequestHeader(name = "Authorization", required = false) String authorization,
             @PathVariable int dogId,
             @RequestBody DogProfileRequest request) {
 
+        UserAccount user = auth.currentUser(authorization);
         validateRequest(request);
-        List<String> photoUrls = validatedPhotoUrls(request);
+        List<String> photoUrls = checkPhotos(request);
 
         DogProfile profile = catalog.requireById(dogId);
+        if (profile.getOwnerId() == null || profile.getOwnerId() != user.getUserId()) {
+            throw new SecurityException("Only the person who added this dog can edit its profile.");
+        }
 
         profile.inputDetails(
                 request.name(),
@@ -125,14 +140,29 @@ public class DogController {
 
     @PostMapping("/{dogId}/likes")
     public DogProfileResponse likeDog(
+            @RequestHeader(name = "Authorization", required = false) String authorization,
             @PathVariable int dogId) {
-        return DogProfileResponse.from(
-                catalog.likeDog(dogId)
-        );
+        UserAccount user = auth.currentUser(authorization);
+        return DogProfileResponse.from(likes.like(dogId, user.getUserId()));
     }
 
-    private List<String> validatedPhotoUrls(DogProfileRequest request) {
-        List<String> urls = request.resolvedPhotoUrls();
+    @DeleteMapping("/{dogId}/likes")
+    public DogProfileResponse unlikeDog(
+            @RequestHeader(name = "Authorization", required = false) String authorization,
+            @PathVariable int dogId) {
+        UserAccount user = auth.currentUser(authorization);
+        return DogProfileResponse.from(likes.unlike(dogId, user.getUserId()));
+    }
+
+    /** Ids of the dogs the signed-in user has liked. */
+    @GetMapping("/liked")
+    public List<Integer> likedDogIds(
+            @RequestHeader(name = "Authorization", required = false) String authorization) {
+        return likes.likedDogIds(auth.currentUser(authorization).getUserId());
+    }
+
+    private List<String> checkPhotos(DogProfileRequest request) {
+        List<String> urls = request.photos();
         if (urls.size() > DogProfile.MAX_PHOTOS) {
             throw new IllegalArgumentException(
                     "A dog profile can have at most " + DogProfile.MAX_PHOTOS + " photos."
@@ -169,7 +199,7 @@ public class DogController {
             );
         }
 
-        if (request.resolvedPhotoUrls().isEmpty()) {
+        if (request.photos().isEmpty()) {
             throw new IllegalArgumentException(
                     "At least one accessible photo URL is required."
             );

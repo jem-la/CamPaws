@@ -17,12 +17,17 @@ export type Dog = {
   about?: string;
   likes: number;
   addedBy?: string;
+  /** Account id of whoever added the dog; undefined for unclaimed sample dogs. */
+  ownerId?: number;
+  /** Last-seen spot, when known. */
+  latitude?: number;
+  longitude?: number;
 };
 
 /** What the form edits. `photos` may hold local URIs that still need uploading. */
 export type DogInput = Pick<
   Dog,
-  'name' | 'photos' | 'furColor' | 'temperament' | 'petting' | 'campusVisits' | 'location' | 'about'
+  'name' | 'photos' | 'furColor' | 'temperament' | 'petting' | 'campusVisits' | 'location' | 'about' | 'latitude' | 'longitude'
 >;
 
 export const TEMPERAMENTS = ['Friendly', 'Playful', 'Calm', 'Shy', 'Energetic', 'Protective'];
@@ -33,16 +38,22 @@ export const PETTING_LABELS: Record<PettingPolicy, string> = {
   no: 'No',
 };
 
-// TODO: replace with the signed-in user once accounts exist.
-export const CURRENT_USER = 'Alex Lee';
-
 type State = {
   dogs: Dog[];
+  /** Ids of dogs the signed-in user has liked. */
+  liked: string[];
   status: 'idle' | 'loading' | 'ready' | 'error';
   error?: string;
 };
 
-let state: State = { dogs: [], status: 'idle' };
+const EMPTY: State = { dogs: [], liked: [], status: 'idle' };
+let state: State = EMPTY;
+
+/** Clears cached dogs and likes, e.g. when the user logs in or out. */
+export function resetDogsState() {
+  inFlight = null;
+  setState({ ...EMPTY });
+}
 
 const listeners = new Set<() => void>();
 const setState = (next: Partial<State>) => {
@@ -70,6 +81,9 @@ function fromDto(d: DogProfileDto): Dog {
     about: opt(d.about),
     likes: d.likeCount,
     addedBy: opt(d.addedBy),
+    ownerId: d.ownerId ?? undefined,
+    latitude: d.latitude ?? undefined,
+    longitude: d.longitude ?? undefined,
   };
 }
 
@@ -87,6 +101,9 @@ async function toRequest(input: DogInput): Promise<DogProfileRequestDto> {
     about: opt(input.about),
     pettingPolicy: input.petting,
     canBePetted: input.petting === 'yes',
+    ...(input.latitude !== undefined && input.longitude !== undefined
+      ? { latitude: input.latitude, longitude: input.longitude }
+      : {}),
   };
 }
 
@@ -115,9 +132,8 @@ let inFlight: Promise<void> | null = null;
 export function refreshDogs(): Promise<void> {
   if (inFlight) return inFlight;
   setState({ status: 'loading', error: undefined });
-  inFlight = api
-    .listDogs()
-    .then((list) => setState({ dogs: list.map(fromDto).reverse(), status: 'ready' }))
+  inFlight = Promise.all([api.listDogs(), api.likedDogIds().catch(() => [] as number[])])
+    .then(([list, liked]) => setState({ dogs: list.map(fromDto).reverse(), liked: liked.map(String), status: 'ready' }))
     .catch((e: Error) => setState({ status: 'error', error: e.message }))
     .finally(() => {
       inFlight = null;
@@ -141,7 +157,7 @@ export async function createDog(input: DogInput): Promise<Dog> {
   const error = validateDog(input);
   if (error) throw new Error(error);
   const body = await toRequest(input);
-  const dog = fromDto(await api.createDog({ ...body, addedBy: CURRENT_USER }));
+  const dog = fromDto(await api.createDog(body));
   upsert(dog, { prepend: true });
   return dog;
 }
@@ -154,15 +170,25 @@ export async function updateDog(id: string, input: DogInput): Promise<Dog> {
   return dog;
 }
 
-export async function likeDog(id: string): Promise<void> {
+/** Likes the dog, or removes the like if the user already liked it. */
+export async function toggleLike(id: string): Promise<void> {
   const before = state.dogs.find((d) => d.id === id);
-  if (before) upsert({ ...before, likes: before.likes + 1 });
+  const wasLiked = state.liked.includes(id);
+  const apply = (liked: boolean, likes: number) => {
+    if (before) upsert({ ...before, likes });
+    setState({ liked: liked ? [...new Set([...state.liked, id])] : state.liked.filter((x) => x !== id) });
+  };
+  if (before) apply(!wasLiked, Math.max(0, before.likes + (wasLiked ? -1 : 1)));
   try {
-    upsert(fromDto(await api.likeDog(id)));
+    upsert(fromDto(await (wasLiked ? api.unlikeDog(id) : api.likeDog(id))));
   } catch (e) {
-    if (before) upsert(before);
+    if (before) apply(wasLiked, before.likes);
     throw e;
   }
+}
+
+export function useLiked(id: string): boolean {
+  return useDogsState().liked.includes(id);
 }
 
 /** Most-liked first; ties keep the oldest profile first. */

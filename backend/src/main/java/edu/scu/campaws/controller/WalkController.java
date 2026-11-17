@@ -3,6 +3,11 @@ package edu.scu.campaws.controller;
 import edu.scu.campaws.dto.StartWalkRequest;
 import edu.scu.campaws.dto.StartWalkResponse;
 import edu.scu.campaws.dto.WalkLocationUpdateRequest;
+import edu.scu.campaws.dto.WalkHistoryDtos.SaveWalkRequest;
+import edu.scu.campaws.dto.WalkHistoryDtos.WalkStats;
+import edu.scu.campaws.dto.WalkHistoryDtos.WalkSummary;
+import edu.scu.campaws.service.AuthService;
+import edu.scu.campaws.service.WalkHistoryService;
 import edu.scu.campaws.service.WalkSessionService;
 
 import org.springframework.http.HttpStatus;
@@ -12,15 +17,36 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/walks")
 public class WalkController {
     private final WalkSessionService sessions;
+    private final AuthService auth;
+    private final WalkHistoryService history;
 
-    public WalkController(WalkSessionService sessions) {
+    public WalkController(WalkSessionService sessions, AuthService auth, WalkHistoryService history) {
         this.sessions = sessions;
+        this.auth = auth;
+        this.history = history;
+    }
+
+    /** Saves a finished walk to the signed-in user's history. */
+    @PostMapping("/history")
+    @ResponseStatus(HttpStatus.CREATED)
+    public WalkSummary saveWalk(
+            @RequestHeader(name = "Authorization", required = false) String authorization,
+            @RequestBody SaveWalkRequest request) {
+        return history.save(auth.currentUser(authorization).getUserId(), request);
+    }
+
+    @GetMapping("/stats")
+    public WalkStats stats(@RequestHeader(name = "Authorization", required = false) String authorization) {
+        return history.stats(auth.currentUser(authorization).getUserId());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     public StartWalkResponse startWalk(
+            @RequestHeader(name = "Authorization", required = false) String authorization,
             @RequestBody StartWalkRequest request) {
+
+        int userId = auth.currentUser(authorization).getUserId();
 
         if (request == null) {
             throw new IllegalArgumentException(
@@ -29,6 +55,7 @@ public class WalkController {
         }
 
         return sessions.startWalk(
+                userId,
                 request.dogId(),
                 request.publicSharing(),
                 request.latitude(),
@@ -39,10 +66,8 @@ public class WalkController {
     @PutMapping("/{walkId}/location")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void updateLocation(
+            @RequestHeader(name = "Authorization", required = false) String authorization,
             @PathVariable int walkId,
-            @RequestHeader(
-                    name = "X-Walk-Token",
-                    required = false) String token,
             @RequestBody WalkLocationUpdateRequest request) {
 
         if (request == null) {
@@ -53,7 +78,7 @@ public class WalkController {
 
         sessions.updateLocation(
                 walkId,
-                token,
+                auth.currentUser(authorization).getUserId(),
                 request.latitude(),
                 request.longitude()
         );
@@ -62,11 +87,9 @@ public class WalkController {
     @PostMapping("/{walkId}/end")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void endWalk(
-            @PathVariable int walkId,
-            @RequestHeader(
-                    name = "X-Walk-Token",
-                    required = false) String token) {
+            @RequestHeader(name = "Authorization", required = false) String authorization,
+            @PathVariable int walkId) {
 
-        sessions.endWalk(walkId, token);
+        sessions.endWalk(walkId, auth.currentUser(authorization).getUserId());
     }
 }

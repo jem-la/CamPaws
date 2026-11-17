@@ -19,6 +19,7 @@ import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -44,14 +45,29 @@ class CampawsApplicationTests {
     @Autowired
     private MockMvc mvc;
 
+    /** Signs up a fresh user and returns the Authorization header value. */
+    private String bearer() throws Exception {
+        String email = "tester" + System.nanoTime() + "@scu.edu";
+        String body = mvc.perform(post("/api/auth/signup")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email": "%s", "displayName": "Test User", "password": "password123",
+                                 "securityQuestion": "What is your favorite food at the SCU cafeteria?",
+                                 "securityAnswer": "pizza"}
+                                """.formatted(email)))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString();
+        return "Bearer " + body.replaceAll("(?s).*\"token\":\"([^\"]+)\".*", "$1");
+    }
+
     @Test
     void seedsSampleDogsOnceWithPhotosAndLocations() {
         repository.deleteAll();
         seeder.run(null);
         seeder.run(null); // second run must not duplicate anything
 
-        List<DogProfile> dogs = catalog.getAllDogProfiles();
-        assertEquals(11, dogs.size());
+        List<DogProfile> dogs = catalog.allDogs();
+        assertEquals(5, dogs.size());
         for (DogProfile dog : dogs) {
             assertFalse(dog.getPhotoUrls().isEmpty(), dog.getName() + " has no photo");
             assertNotNull(dog.getFurColor(), dog.getName() + " has no fur color");
@@ -59,7 +75,7 @@ class CampawsApplicationTests {
         }
         assertFalse(catalog.searchByName("mochi").isEmpty());
         // Every sample dog is on campus, so all are within 1 km of its center.
-        assertEquals(11, catalog.findNearbyDogs(37.3490, -121.9395).size());
+        assertEquals(5, catalog.findNearbyDogs(37.3490, -121.9395).size());
     }
 
     @Test
@@ -72,8 +88,10 @@ class CampawsApplicationTests {
     @Test
     void createUpdateAndFindNearbyOverHttp() throws Exception {
         repository.deleteAll();
+        String auth = bearer();
 
         String created = mvc.perform(post("/api/dogs")
+                        .header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Rex", "photoUrls": ["https://x.test/rex.jpg"],
@@ -102,6 +120,7 @@ class CampawsApplicationTests {
 
         // Editing without coordinates keeps the saved location.
         mvc.perform(put("/api/dogs/" + id)
+                        .header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Rex II", "photoUrls": ["https://x.test/rex.jpg"], "pettingPolicy": "ask"}
@@ -110,16 +129,32 @@ class CampawsApplicationTests {
                 .andExpect(jsonPath("$.name").value("Rex II"))
                 .andExpect(jsonPath("$.latitude").value(37.3496));
 
-        mvc.perform(post("/api/dogs/" + id + "/likes"))
+        mvc.perform(post("/api/dogs/" + id + "/likes").header("Authorization", auth))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.likeCount").value(1));
+        // Liking twice does not count twice; unliking removes it.
+        mvc.perform(post("/api/dogs/" + id + "/likes").header("Authorization", auth))
+                .andExpect(jsonPath("$.likeCount").value(1));
+        mvc.perform(delete("/api/dogs/" + id + "/likes").header("Authorization", auth))
+                .andExpect(jsonPath("$.likeCount").value(0));
+
+        // Writing without logging in is rejected.
+        mvc.perform(post("/api/dogs/" + id + "/likes")).andExpect(status().isUnauthorized());
+        // Someone else cannot edit this dog.
+        mvc.perform(put("/api/dogs/" + id)
+                        .header("Authorization", bearer())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"name\": \"Hacked\", \"photoUrls\": [\"https://x.test/a.jpg\"]}"))
+                .andExpect(status().isForbidden());
     }
 
     @Test
     void invalidRequestsAreRejectedAndNothingIsSaved() throws Exception {
         repository.deleteAll();
+        String auth = bearer();
 
         mvc.perform(post("/api/dogs")
+                        .header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Rex", "photoUrls": ["https://x.test/rex.jpg"], "latitude": 37.3}
@@ -127,6 +162,7 @@ class CampawsApplicationTests {
                 .andExpect(status().isBadRequest());
 
         mvc.perform(post("/api/dogs")
+                        .header("Authorization", auth)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name": "Rex", "photoUrls": ["https://x.test/rex.jpg"], "pettingPolicy": "maybe"}

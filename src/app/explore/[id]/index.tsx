@@ -1,17 +1,33 @@
 import { Image } from 'expo-image';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  useWindowDimensions,
+  View,
+  type ScrollViewInstance,
+} from 'react-native';
 
+import { DogComments } from '@/components/dog-comments';
 import { RED } from '@/components/dog-form';
+import { useAuth } from '@/lib/auth-store';
 import { showAlert } from '@/lib/confirm';
-import { dogTint, furSwatches, likeDog, PETTING_LABELS, useDog } from '@/lib/dogs-store';
+import { dogTint, furSwatches, PETTING_LABELS, toggleLike, useDog, useLiked } from '@/lib/dogs-store';
 
 export default function DogProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { dog, error } = useDog(id);
   const { width } = useWindowDimensions();
   const [photoIndex, setPhotoIndex] = useState(0);
+  const { user } = useAuth();
+  const liked = useLiked(id);
+  const scrollRef = useRef<ScrollViewInstance>(null);
+  const [commentsY, setCommentsY] = useState(0);
+  const [commentCount, setCommentCount] = useState<number | undefined>();
 
   if (!dog) {
     return (
@@ -27,11 +43,17 @@ export default function DogProfileScreen() {
   const tags = [dog.temperament, dog.petting === 'ask' ? 'Ask before petting' : `Petting: ${PETTING_LABELS[dog.petting]}`];
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      ref={scrollRef}
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets>
       <Stack.Screen
         options={{
           title: 'Dog profile',
-          headerRight: () => (
+          headerRight: () =>
+            dog.ownerId !== undefined && dog.ownerId === user?.userId ? (
             <Pressable
               hitSlop={10}
               accessibilityRole="button"
@@ -39,7 +61,7 @@ export default function DogProfileScreen() {
               onPress={() => router.push({ pathname: '/explore/[id]/edit', params: { id: dog.id } })}>
               <Text style={styles.headerAction}>Edit</Text>
             </Pressable>
-          ),
+            ) : null,
         }}
       />
 
@@ -86,13 +108,14 @@ export default function DogProfileScreen() {
       {dog.location && <Text style={styles.location}>⌖ Usually near {dog.location}</Text>}
 
       <View style={styles.actions}>
-        <Pressable style={[styles.action, styles.likeAction]} onPress={() => likeDog(dog.id).catch((e: Error) => showAlert('Couldn’t like', e.message))}>
-          <Text style={styles.actionText}>Like · {dog.likes} ♡</Text>
+        <Pressable style={[styles.action, styles.likeAction]} onPress={() => toggleLike(dog.id).catch((e: Error) => showAlert('Couldn’t update like', e.message))}>
+          <Text style={styles.actionText}>{liked ? 'Liked' : 'Like'} · {dog.likes} {liked ? '♥' : '♡'}</Text>
         </Pressable>
         <Pressable
           style={[styles.action, styles.commentAction]}
-          onPress={() => showAlert('Comments', 'Comments are coming soon.')}>
-          <Text style={styles.actionText}>Comments</Text>
+          accessibilityRole="button"
+          onPress={() => scrollRef.current?.scrollTo({ y: commentsY, animated: true })}>
+          <Text style={styles.actionText}>Comments{commentCount !== undefined ? ` · ${commentCount}` : ''}</Text>
         </Pressable>
       </View>
 
@@ -108,6 +131,10 @@ export default function DogProfileScreen() {
       <View style={styles.metaRow}>
         <Text style={styles.meta}>{dog.addedBy ? `Added by ${dog.addedBy}` : ''}</Text>
         {dog.campusVisits && <Text style={styles.meta}>Visits: {dog.campusVisits.toLowerCase()}</Text>}
+      </View>
+
+      <View onLayout={(e) => setCommentsY(e.nativeEvent.layout.y)}>
+        <DogComments dogId={dog.id} onCountChange={setCommentCount} />
       </View>
     </ScrollView>
   );

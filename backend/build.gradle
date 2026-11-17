@@ -21,6 +21,9 @@ repositories {
 dependencies {
     implementation 'org.springframework.boot:spring-boot-starter-webmvc'
 
+    // Password hashing only (BCrypt); the full Spring Security stack is not used.
+    implementation 'org.springframework.security:spring-security-crypto'
+
     // PostgreSQL + PostGIS storage. Versions are managed by the Spring Boot plugin.
     implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
     implementation 'org.springframework.boot:spring-boot-starter-flyway'

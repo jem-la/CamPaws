@@ -23,7 +23,7 @@ public record DogProfileRequest(
         Double longitude
 ) {
     /** Photos to save: {@code photoUrls} when given, otherwise the single {@code photoUrl}. */
-    public List<String> resolvedPhotoUrls() {
+    public List<String> photos() {
         if (photoUrls != null && !photoUrls.isEmpty()) {
             return photoUrls;
         }

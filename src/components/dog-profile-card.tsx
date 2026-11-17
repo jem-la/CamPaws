@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { showAlert } from '@/lib/confirm';
-import { type Dog, dogTint, furSwatches, likeDog } from '@/lib/dogs-store';
+import { type Dog, dogTint, furSwatches, toggleLike, useLiked } from '@/lib/dogs-store';
 
 export const RED = '#c92e45';
 
@@ -16,9 +16,10 @@ type DogCardProps = {
 /** A dog row used across Home, Leaderboard and My Dogs. Tapping it opens the profile. */
 export function DogCard({ dog, rank }: DogCardProps) {
   const swatches = furSwatches(dog.furColor);
+  const liked = useLiked(dog.id);
 
   const like = () => {
-    likeDog(dog.id).catch((e: Error) => showAlert('Couldn’t like', e.message));
+    toggleLike(dog.id).catch((e: Error) => showAlert('Couldn’t like', e.message));
   };
 
   return (
@@ -62,10 +63,10 @@ export function DogCard({ dog, rank }: DogCardProps) {
         <Pressable
           hitSlop={12}
           accessibilityRole="button"
-          accessibilityLabel={`Like ${dog.name}, ${dog.likes} likes`}
+          accessibilityLabel={`${liked ? 'Unlike' : 'Like'} ${dog.name}, ${dog.likes} likes`}
           onPress={like}
           style={styles.likeButton}>
-          <Text style={styles.heart}>♥</Text>
+          <Text style={[styles.heart, !liked && styles.heartOff]}>{liked ? '♥' : '♡'}</Text>
           <Text style={styles.likes}>{dog.likes}</Text>
         </Pressable>
         <View style={styles.swatches}>
@@ -100,6 +101,7 @@ const styles = StyleSheet.create({
   right: { alignItems: 'center', justifyContent: 'center', paddingHorizontal: 8, gap: 6 },
   likeButton: { alignItems: 'center' },
   heart: { fontSize: 22, color: RED },
+  heartOff: { color: '#c9b9bd' },
   likes: { fontSize: 11, color: '#8f858b' },
   swatches: { flexDirection: 'row', gap: 3 },
   swatch: { width: 12, height: 12, borderRadius: 6, borderWidth: 1, borderColor: '#e2d8d4' },

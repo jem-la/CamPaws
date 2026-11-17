@@ -15,9 +15,10 @@ public interface DogRepository extends JpaRepository<DogProfile, Integer> {
     @Query(value = "SELECT nextval('dogs_dog_id_seq')", nativeQuery = true)
     long nextDogId();
 
-    List<DogProfile> findAllByOrderByDogIdAsc();
+    List<DogProfile> findAllByOrderByDogId();
 
-    List<DogProfile> findAllByOrderByLikeCountDescDogIdAsc();
+    @Query("SELECT d FROM DogProfile d ORDER BY d.likeCount DESC, d.dogId")
+    List<DogProfile> topLiked();
 
     /*
      * Name searches. {@code namePattern} is lower-cased and LIKE-escaped with '\\';
@@ -67,4 +68,10 @@ public interface DogRepository extends JpaRepository<DogProfile, Integer> {
     @Query("UPDATE DogProfile d SET d.likeCount = d.likeCount + 1 "
             + "WHERE d.dogId = :dogId AND d.likeCount < 2147483647")
     int incrementLikes(@Param("dogId") int dogId);
+
+    /** Removes one like in a single UPDATE; never goes below zero. */
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("UPDATE DogProfile d SET d.likeCount = d.likeCount - 1 "
+            + "WHERE d.dogId = :dogId AND d.likeCount > 0")
+    int decrementLikes(@Param("dogId") int dogId);
 }

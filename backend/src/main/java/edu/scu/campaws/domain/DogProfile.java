@@ -74,6 +74,10 @@ public class DogProfile {
     @Column(name = "added_by", length = 120)
     private String addedBy;
 
+    /** The account that created this dog; null for sample dogs and after the owner deletes their account. */
+    @Column(name = "owner_id")
+    private Integer ownerId;
+
     /** Required by JPA. */
     protected DogProfile() {
     }
@@ -299,6 +303,14 @@ public class DogProfile {
 
     public String getAddedBy() {
         return addedBy;
+    }
+
+    public Integer getOwnerId() {
+        return ownerId;
+    }
+
+    public void setOwnerId(Integer ownerId) {
+        this.ownerId = ownerId;
     }
 
     public void setAddedBy(String addedBy) {

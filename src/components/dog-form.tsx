@@ -1,5 +1,6 @@
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import * as Location from 'expo-location';
 import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import {
@@ -42,8 +43,8 @@ type DogFormProps = {
 export const EMPTY_DOG: DogInput = { name: '', photos: [], petting: 'ask' };
 
 export function toDogInput(dog: Dog): DogInput {
-  const { name, photos, furColor, temperament, petting, campusVisits, location, about } = dog;
-  return { name, photos, furColor, temperament, petting, campusVisits, location, about };
+  const { name, photos, furColor, temperament, petting, campusVisits, location, about, latitude, longitude } = dog;
+  return { name, photos, furColor, temperament, petting, campusVisits, location, about, latitude, longitude };
 }
 
 export function DogForm({ initial = EMPTY_DOG, submitLabel, notice, onChange, onSubmit }: DogFormProps) {
@@ -99,6 +100,28 @@ export function DogForm({ initial = EMPTY_DOG, submitLabel, notice, onChange, on
       { text: 'Choose from library', onPress: () => addPhotos('library') },
       { text: 'Cancel', style: 'cancel' },
     ]);
+  };
+
+  const [pinning, setPinning] = useState(false);
+  const pinHere = async () => {
+    setPinning(true);
+    try {
+      const perm = await Location.requestForegroundPermissionsAsync();
+      if (!perm.granted) {
+        showAlert('Location access needed', 'Allow location access so CamPaws can pin where you saw this dog.');
+        return;
+      }
+      const { coords } = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+      setValue((v) => {
+        const next = { ...v, latitude: coords.latitude, longitude: coords.longitude };
+        onChange?.(next);
+        return next;
+      });
+    } catch {
+      showAlert('Couldn’t get your location', 'Check that location services are on and try again.');
+    } finally {
+      setPinning(false);
+    }
   };
 
   const removePhoto = (index: number) => set('photos', value.photos.filter((_, i) => i !== index));
@@ -265,6 +288,18 @@ export function DogForm({ initial = EMPTY_DOG, submitLabel, notice, onChange, on
             maxLength={120}
             accessibilityLabel="Usually seen near"
           />
+          <Pressable
+            accessibilityRole="button"
+            onPress={pinning ? undefined : pinHere}
+            style={({ pressed }) => [styles.pinButton, pressed && styles.pressed]}>
+            <Text style={styles.pinText}>
+              {pinning
+                ? 'Finding you…'
+                : value.latitude !== undefined
+                  ? '⌖ Spot pinned on the map · tap to update'
+                  : '⌖ Pin my current location on the map'}
+            </Text>
+          </Pressable>
         </Field>
 
         <Field label="About">
@@ -456,6 +491,8 @@ const styles = StyleSheet.create({
   chipText: { fontSize: 13, color: '#5d565c' },
   chipTextSelected: { color: RED, fontWeight: '700' },
   error: { color: RED, fontSize: 13, fontWeight: '600' },
+  pinButton: { marginTop: 8, paddingVertical: 6 },
+  pinText: { color: RED, fontSize: 13, fontWeight: '700' },
   submit: {
     height: 50,
     borderRadius: 14,

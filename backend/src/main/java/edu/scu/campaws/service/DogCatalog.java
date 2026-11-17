@@ -28,10 +28,10 @@ public class DogCatalog {
 
     /**
      * Builds an unsaved profile with a fresh ID. Fill in the rest, then pass it to
-     * {@link #createDogProfile(DogProfile)}. Nothing is stored if you never do.
+     * {@link #addDog(DogProfile)}. Nothing is stored if you never do.
      */
     @Transactional
-    public DogProfile newDogProfile(
+    public DogProfile newDog(
             String name,
             String temperament,
             boolean canBePetted,
@@ -46,9 +46,9 @@ public class DogCatalog {
         );
     }
 
-    /** Stores a new profile created with {@link #newDogProfile}. */
+    /** Stores a new profile created with {@link #newDog}. */
     @Transactional
-    public DogProfile createDogProfile(DogProfile dog) {
+    public DogProfile addDog(DogProfile dog) {
         if (dog == null) {
             throw new IllegalArgumentException(
                     "Dog profile cannot be null."
@@ -66,14 +66,14 @@ public class DogCatalog {
 
     /** Shortcut: create and store a profile with just the basic details. */
     @Transactional
-    public DogProfile createDogProfile(
+    public DogProfile addDog(
             String name,
             String temperament,
             boolean canBePetted,
             String campusFrequency) {
 
-        return createDogProfile(
-                newDogProfile(name, temperament, canBePetted, campusFrequency)
+        return addDog(
+                newDog(name, temperament, canBePetted, campusFrequency)
         );
     }
 
@@ -107,8 +107,8 @@ public class DogCatalog {
         );
     }
 
-    public List<DogProfile> getAllDogProfiles() {
-        return dogs.findAllByOrderByDogIdAsc();
+    public List<DogProfile> allDogs() {
+        return dogs.findAllByOrderByDogId();
     }
 
     public List<DogProfile> findDogs(String query, Boolean canBePetted) {
@@ -150,15 +150,15 @@ public class DogCatalog {
         return dogs.findWithinMeters(latitude, longitude, radiusMeters);
     }
 
-    public List<DogProfile> viewLeaderboard() {
-        return dogs.findAllByOrderByLikeCountDescDogIdAsc();
+    public List<DogProfile> leaderboard() {
+        return dogs.topLiked();
     }
 
     /**
      * Profiles that are probably the same dog: the name matches (ignoring case and spacing)
      * and the fur colors don't contradict each other (either one blank, or equal).
      */
-    public List<DogProfile> findPossibleDuplicates(
+    public List<DogProfile> findDuplicates(
             String name, String furColor, Integer ignoreDogId) {
 
         String wantedName = normalizeFilter(name);
