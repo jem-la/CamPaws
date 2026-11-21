@@ -24,7 +24,17 @@ You don't need to install Gradle, Expo, PostgreSQL or PostGIS yourself. The Grad
 git clone https://github.com/jem-la/CamPaws.git
 cd CamPaws
 npm install
+./scripts/download-model.sh
 ```
+
+`download-model.sh` downloads the photo-matching model (`backend/models/dinov2-small.onnx`,
+about 88 MB) from Hugging Face. It's too big for GitHub, so it isn't in the repo. The backend uses it
+to spot a dog that's already on CamPaws from its photo, even if the name or fur color is different.
+Without it the app still works, but only same-name duplicates are suggested.
+
+On Windows, run the script from Git Bash, or download
+https://huggingface.co/Xenova/dinov2-small/resolve/main/onnx/model.onnx and save it as
+`backend/models/dinov2-small.onnx`.
 
 ## 3. Run it (two terminals)
 
@@ -52,6 +62,9 @@ npx expo start
 
 To stop, press `Ctrl+C` in both terminals. The database container keeps running in the background
 so the next start is quick; stop it with `cd backend && docker compose down`.
+
+**Or one terminal (macOS/Linux):** `npm run dev` starts the backend in the background (its output
+goes to `backend/bootRun.log`) and Expo in the foreground. `Ctrl+C` stops both.
 
 ## Data
 
@@ -102,5 +115,7 @@ npx expo lint                    # app lint
 - **`Toolchain ... languageVersion=17` not found**: install JDK 17 (see step 1).
 - **App says "Can't reach the CamPaws server" on a phone**: start Expo with your computer's IP,
   e.g. `EXPO_PUBLIC_API_URL=http://192.168.1.20:8080 npx expo start`.
+- **Backend log says `Dog photo matching is off`**: the model file is missing. Run
+  `./scripts/download-model.sh`, then restart the backend.
 - **Using your own Postgres instead of Docker**: it needs the PostGIS extension. Set
   `DATABASE_URL=jdbc:postgresql://host:port/db`, `DATABASE_USERNAME` and `DATABASE_PASSWORD`.
