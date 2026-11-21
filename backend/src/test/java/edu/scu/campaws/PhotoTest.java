@@ -3,6 +3,7 @@ package edu.scu.campaws;
 import edu.scu.campaws.domain.Photo;
 
 import org.junit.jupiter.api.Test;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class PhotoTest {
@@ -30,29 +31,25 @@ class PhotoTest {
     @Test
     void rejectsNullUrl() {
         Photo photo = new Photo(1);
-        assertThrows(IllegalArgumentException.class,
-                () -> photo.uploadPhoto(null));
+        assertThrows(IllegalArgumentException.class, () -> photo.uploadPhoto(null));
     }
 
     @Test
     void rejectsBlankUrl() {
         Photo photo = new Photo(1);
-        assertThrows(IllegalArgumentException.class,
-                () -> photo.uploadPhoto("   "));
+        assertThrows(IllegalArgumentException.class, () -> photo.uploadPhoto("   "));
     }
 
     @Test
     void rejectsEmptyUrl() {
         Photo photo = new Photo(1);
-        assertThrows(IllegalArgumentException.class,
-                () -> photo.uploadPhoto(""));
+        assertThrows(IllegalArgumentException.class, () -> photo.uploadPhoto(""));
     }
 
     @Test
     void rejectsFileScheme() {
         Photo photo = new Photo(1);
-        assertThrows(IllegalArgumentException.class,
-                () -> photo.uploadPhoto("file:///tmp/dog.jpg"));
+        assertThrows(IllegalArgumentException.class, () -> photo.uploadPhoto("file:///tmp/dog.jpg"));
     }
 
     @Test

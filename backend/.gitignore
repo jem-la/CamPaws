@@ -1,1 +1,4 @@
 bootRun.log
+
+# Downloaded by scripts/download-model.sh
+/models/

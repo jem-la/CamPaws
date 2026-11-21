@@ -52,3 +52,4 @@ example
 **/build/
 # Dog photos uploaded to the local backend
 backend/uploads/
+backend/tunnel.log

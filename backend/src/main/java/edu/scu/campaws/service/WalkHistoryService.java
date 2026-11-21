@@ -13,10 +13,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 
-/** Saves finished walks and computes a user's walk statistics. */
 @Service
 public class WalkHistoryService {
-    /** Sanity limits: no walk is longer than a day or 100 km. */
+    // Sanity limits for a single walk.
     static final Duration MAX_DURATION = Duration.ofHours(24);
     static final double MAX_DISTANCE_METERS = 100_000;
     private static final int RECENT = 10;

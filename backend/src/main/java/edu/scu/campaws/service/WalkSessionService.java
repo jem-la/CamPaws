@@ -25,146 +25,85 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
-
 @Service
 public class WalkSessionService {
-    static final Duration MAX_AGE =
-            Duration.ofMinutes(5);
+    static final Duration MAX_AGE = Duration.ofMinutes(10);
 
     private static final String PUBLIC_LABEL = "Dog nearby";
 
     private final DogCatalog catalog;
     private final double gridDegrees;
     private final Clock clock;
-
     private final AtomicInteger nextWalkId = new AtomicInteger(1);
-
-    private final ConcurrentMap<Integer, Session> sessions =
-            new ConcurrentHashMap<>();
+    private final ConcurrentMap<Integer, Session> sessions = new ConcurrentHashMap<>();
 
     @Autowired
     public WalkSessionService(
             DogCatalog catalog,
-            @Value("${campaws.map.grid-degrees:0.003}")
-            double gridDegrees) {
+            @Value("${campaws.map.grid-degrees:0.003}") double gridDegrees) {
         this(catalog, gridDegrees, Clock.systemUTC());
     }
 
-    WalkSessionService(
-            DogCatalog catalog,
-            double gridDegrees,
-            Clock clock) {
-
-        if (!Double.isFinite(gridDegrees)
-                || gridDegrees <= 0
-                || gridDegrees > 1) {
-            throw new IllegalArgumentException(
-                    "Map privacy grid must be greater than 0 and at most 1 degree."
-            );
+    WalkSessionService(DogCatalog catalog, double gridDegrees, Clock clock) {
+        if (!Double.isFinite(gridDegrees) || gridDegrees <= 0 || gridDegrees > 1) {
+            throw new IllegalArgumentException("Map privacy grid must be greater than 0 and at most 1 degree.");
         }
-
         if (catalog == null || clock == null) {
-            throw new IllegalArgumentException(
-                    "Catalog and clock are required."
-            );
+            throw new IllegalArgumentException("Catalog and clock are required.");
         }
-
         this.catalog = catalog;
         this.gridDegrees = gridDegrees;
         this.clock = clock;
     }
 
-    public StartWalkResponse startWalk(
-            int userId,
-            int dogId,
-            boolean publicSharing,
-            Double latitude,
-            Double longitude) {
-
+    public StartWalkResponse startWalk(int userId, int dogId, boolean publicSharing, Double latitude,
+                                       Double longitude) {
         if (dogId <= 0) {
-            throw new IllegalArgumentException(
-                    "Dog ID must be positive."
-            );
+            throw new IllegalArgumentException("Dog ID must be positive.");
         }
-
         catalog.requireById(dogId);
 
-        Double acceptedLatitude = null;
-        Double acceptedLongitude = null;
+        Double startLat = null;
+        Double startLng = null;
         Instant now = clock.instant();
 
         if (publicSharing) {
             if (latitude == null || longitude == null) {
-                throw new IllegalArgumentException(
-                        "Coordinates are required when public sharing is enabled."
-                );
+                throw new IllegalArgumentException("Coordinates are required when public sharing is enabled.");
             }
-
             DogProfile.validateCoordinates(latitude, longitude);
-
-            acceptedLatitude = latitude;
-            acceptedLongitude = longitude;
+            startLat = latitude;
+            startLng = longitude;
         }
 
-
         int id = nextWalkId.getAndIncrement();
-
         Walk walk = new Walk(id);
-        walk.startWalk(
-                LocalDateTime.ofInstant(now, ZoneOffset.UTC)
-        );
+        walk.startWalk(LocalDateTime.ofInstant(now, ZoneOffset.UTC));
 
-        Session session = new Session(
-                id,
-                dogId,
-                walk,
-                userId,
-                UUID.randomUUID().toString(),
-                publicSharing,
-                acceptedLatitude,
-                acceptedLongitude,
-                publicSharing ? now : null
-        );
-
+        Session session = new Session(id, dogId, walk, userId, UUID.randomUUID().toString(), publicSharing,
+                startLat, startLng, publicSharing ? now : null);
         sessions.put(id, session);
 
         String message = publicSharing
                 ? "Public sharing is on. Only an approximate anonymous marker is returned on the map."
                 : "Private walk started; no coordinates are retained or shown on the public map.";
-
-        return new StartWalkResponse(
-                id, publicSharing, message
-        );
+        return new StartWalkResponse(id, publicSharing, message);
     }
 
-    public void updateLocation(
-            int walkId,
-            int userId,
-            Double latitude,
-            Double longitude) {
-
+    public void updateLocation(int walkId, int userId, Double latitude, Double longitude) {
         Session session = requireSession(walkId);
         checkOwner(session, userId);
 
         synchronized (session) {
             if (!session.walk.isActive()) {
-                throw new IllegalStateException(
-                        "This walk has ended."
-                );
+                throw new IllegalStateException("This walk has ended.");
             }
-
             if (!session.publicSharing) {
-                throw new IllegalStateException(
-                        "Location sharing is off for this walk."
-                );
+                throw new IllegalStateException("Location sharing is off for this walk.");
             }
-
             if (latitude == null || longitude == null) {
-                throw new IllegalArgumentException(
-                        "Latitude and longitude are required."
-                );
+                throw new IllegalArgumentException("Latitude and longitude are required.");
             }
-
             DogProfile.validateCoordinates(latitude, longitude);
 
             session.latitude = latitude;
@@ -179,21 +118,10 @@ public class WalkSessionService {
 
         synchronized (session) {
             if (!session.walk.isActive()) {
-                throw new IllegalStateException(
-                        "This walk has already ended."
-                );
+                throw new IllegalStateException("This walk has already ended.");
             }
-
-            session.walk.endWalk(
-                    LocalDateTime.ofInstant(
-                            clock.instant(), ZoneOffset.UTC
-                    )
-            );
-
-            session.publicSharing = false;
-            session.latitude = null;
-            session.longitude = null;
-            session.lastUpdatedAt = null;
+            session.walk.endWalk(LocalDateTime.ofInstant(clock.instant(), ZoneOffset.UTC));
+            session.stopSharing();
         }
     }
 
@@ -201,7 +129,6 @@ public class WalkSessionService {
         expireOld();
 
         List<MapMarkerResponse> markers = new ArrayList<>();
-
         for (Session session : sessions.values()) {
             synchronized (session) {
                 if (!session.walk.isActive()
@@ -211,51 +138,28 @@ public class WalkSessionService {
                         || session.lastUpdatedAt == null) {
                     continue;
                 }
-
                 markers.add(new MapMarkerResponse(
                         session.publicMarkerId,
-                        roundCoordinate(
-                                session.latitude,
-                                gridDegrees, -90, 90
-                        ),
-                        roundCoordinate(
-                                session.longitude,
-                                gridDegrees, -180, 180
-                        ),
+                        roundCoordinate(session.latitude, gridDegrees, -90, 90),
+                        roundCoordinate(session.longitude, gridDegrees, -180, 180),
                         PUBLIC_LABEL,
-                        session.lastUpdatedAt.truncatedTo(
-                                ChronoUnit.MINUTES
-                        ),
-                        true
-                ));
+                        session.lastUpdatedAt.truncatedTo(ChronoUnit.MINUTES),
+                        true));
             }
         }
-
-        markers.sort(
-                Comparator.comparing(MapMarkerResponse::markerId)
-        );
-
+        markers.sort(Comparator.comparing(MapMarkerResponse::markerId));
         return markers;
     }
 
-    @Scheduled(
-            fixedDelayString =
-                    "${campaws.map.cleanup-interval-ms:30000}"
-    )
+    @Scheduled(fixedDelayString = "${campaws.map.cleanup-interval-ms:30000}")
     public void expireOld() {
-        Instant cutoff =
-                clock.instant().minus(MAX_AGE);
+        Instant cutoff = clock.instant().minus(MAX_AGE);
 
         for (Session session : sessions.values()) {
             synchronized (session) {
                 if (session.publicSharing
-                        && (session.lastUpdatedAt == null
-                        || session.lastUpdatedAt.isBefore(cutoff))) {
-
-                    session.publicSharing = false;
-                    session.latitude = null;
-                    session.longitude = null;
-                    session.lastUpdatedAt = null;
+                        && (session.lastUpdatedAt == null || session.lastUpdatedAt.isBefore(cutoff))) {
+                    session.stopSharing();
                 }
             }
         }
@@ -263,13 +167,9 @@ public class WalkSessionService {
 
     private Session requireSession(int id) {
         Session session = sessions.get(id);
-
         if (session == null) {
-            throw new NoSuchElementException(
-                    "Walk session not found."
-            );
+            throw new NoSuchElementException("Walk session not found.");
         }
-
         return session;
     }
 
@@ -279,15 +179,8 @@ public class WalkSessionService {
         }
     }
 
-    private double roundCoordinate(
-            double coordinate,
-            double grid,
-            double min,
-            double max) {
-
-        double rounded =
-                Math.round(coordinate / grid) * grid;
-
+    private double roundCoordinate(double coordinate, double grid, double min, double max) {
+        double rounded = Math.round(coordinate / grid) * grid;
         return Math.max(min, Math.min(max, rounded));
     }
 
@@ -295,7 +188,7 @@ public class WalkSessionService {
         @SuppressWarnings("unused")
         private final int walkId;
 
-        // Stored internally, never copied into public responses.
+        // Kept internally, never copied into public responses.
         @SuppressWarnings("unused")
         private final int dogId;
 
@@ -308,17 +201,8 @@ public class WalkSessionService {
         private Double longitude;
         private Instant lastUpdatedAt;
 
-        private Session(
-                int walkId,
-                int dogId,
-                Walk walk,
-                int userId,
-                String publicMarkerId,
-                boolean publicSharing,
-                Double latitude,
-                Double longitude,
-                Instant lastUpdatedAt) {
-
+        private Session(int walkId, int dogId, Walk walk, int userId, String publicMarkerId,
+                        boolean publicSharing, Double latitude, Double longitude, Instant lastUpdatedAt) {
             this.walkId = walkId;
             this.dogId = dogId;
             this.walk = walk;
@@ -328,6 +212,13 @@ public class WalkSessionService {
             this.latitude = latitude;
             this.longitude = longitude;
             this.lastUpdatedAt = lastUpdatedAt;
+        }
+
+        private void stopSharing() {
+            publicSharing = false;
+            latitude = null;
+            longitude = null;
+            lastUpdatedAt = null;
         }
     }
 }

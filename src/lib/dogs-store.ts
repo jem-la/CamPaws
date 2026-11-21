@@ -1,13 +1,13 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 
-import { api, type DogProfileDto, type DogProfileRequestDto } from '@/lib/api';
+import { api, apiBaseUrl, type DogProfileDto, type DogProfileRequestDto } from '@/lib/api';
 
 export type PettingPolicy = 'ask' | 'yes' | 'no';
 
 export type Dog = {
   id: string;
   name: string;
-  /** Photo URLs. The first one is the profile photo. */
+  // The first photo is the profile photo.
   photos: string[];
   furColor?: string;
   temperament?: string;
@@ -17,14 +17,13 @@ export type Dog = {
   about?: string;
   likes: number;
   addedBy?: string;
-  /** Account id of whoever added the dog; undefined for unclaimed sample dogs. */
+  // undefined for unclaimed sample dogs
   ownerId?: number;
-  /** Last-seen spot, when known. */
   latitude?: number;
   longitude?: number;
 };
 
-/** What the form edits. `photos` may hold local URIs that still need uploading. */
+// `photos` may hold local URIs that still need uploading.
 export type DogInput = Pick<
   Dog,
   'name' | 'photos' | 'furColor' | 'temperament' | 'petting' | 'campusVisits' | 'location' | 'about' | 'latitude' | 'longitude'
@@ -40,7 +39,6 @@ export const PETTING_LABELS: Record<PettingPolicy, string> = {
 
 type State = {
   dogs: Dog[];
-  /** Ids of dogs the signed-in user has liked. */
   liked: string[];
   status: 'idle' | 'loading' | 'ready' | 'error';
   error?: string;
@@ -49,7 +47,6 @@ type State = {
 const EMPTY: State = { dogs: [], liked: [], status: 'idle' };
 let state: State = EMPTY;
 
-/** Clears cached dogs and likes, e.g. when the user logs in or out. */
 export function resetDogsState() {
   inFlight = null;
   setState({ ...EMPTY });
@@ -68,11 +65,17 @@ const subscribe = (listener: () => void) => {
 const norm = (v?: string) => (v ?? '').trim().toLowerCase();
 const opt = (v?: string | null) => (v && v.trim() ? v.trim() : undefined);
 
+// Photos uploaded from another device are saved with that device's address (e.g. localhost), so point them at our server.
+function reachablePhoto(url: string): string {
+  const own = /^https?:\/\/[^/]+(\/api\/photos\/[^/?#]+)$/i.exec(url);
+  return own ? `${apiBaseUrl()}${own[1]}` : url;
+}
+
 function fromDto(d: DogProfileDto): Dog {
   return {
     id: String(d.dogId),
     name: d.name,
-    photos: d.photoUrls?.length ? d.photoUrls : d.photoUrl ? [d.photoUrl] : [],
+    photos: (d.photoUrls?.length ? d.photoUrls : d.photoUrl ? [d.photoUrl] : []).map(reachablePhoto),
     furColor: opt(d.furColor),
     temperament: opt(d.temperament),
     petting: d.pettingPolicy ?? (d.canBePetted ? 'yes' : 'ask'),
@@ -118,7 +121,6 @@ function upsert(dog: Dog, { prepend = false } = {}) {
   });
 }
 
-/** Returns an error message, or null when the input can be saved. */
 export function validateDog(input: DogInput): string | null {
   if (input.photos.length === 0) return 'Add at least one photo of the dog.';
   if (!input.name.trim()) return 'Give the dog a name.';
@@ -128,7 +130,6 @@ export function validateDog(input: DogInput): string | null {
 
 let inFlight: Promise<void> | null = null;
 
-/** Loads every dog from the backend. Concurrent calls share one request. */
 export function refreshDogs(): Promise<void> {
   if (inFlight) return inFlight;
   setState({ status: 'loading', error: undefined });
@@ -147,10 +148,19 @@ export async function fetchDog(id: string): Promise<Dog> {
   return dog;
 }
 
-/** Profiles that are probably the same dog (alternative flow 2), checked on the server. */
 export async function findDuplicates(input: DogInput, ignoreId?: string): Promise<Dog[]> {
   const list = await api.findDuplicates(input.name.trim(), opt(input.furColor), ignoreId);
   return list.map(fromDto);
+}
+
+export async function findPhotoMatch(photos: string[]): Promise<{ dog: Dog; similarity: number } | undefined> {
+  let best: { dog: Dog; similarity: number } | undefined;
+  for (const uri of photos) {
+    if (/^https?:\/\//i.test(uri)) continue; // already saved
+    const [top] = await api.matchDogPhoto(uri);
+    if (top && (!best || top.similarity > best.similarity)) best = { dog: fromDto(top.dog), similarity: top.similarity };
+  }
+  return best;
 }
 
 export async function createDog(input: DogInput): Promise<Dog> {
@@ -170,7 +180,11 @@ export async function updateDog(id: string, input: DogInput): Promise<Dog> {
   return dog;
 }
 
-/** Likes the dog, or removes the like if the user already liked it. */
+export async function deleteDog(id: string): Promise<void> {
+  await api.deleteDog(id);
+  setState({ dogs: state.dogs.filter((d) => d.id !== id), liked: state.liked.filter((x) => x !== id) });
+}
+
 export async function toggleLike(id: string): Promise<void> {
   const before = state.dogs.find((d) => d.id === id);
   const wasLiked = state.liked.includes(id);
@@ -191,7 +205,6 @@ export function useLiked(id: string): boolean {
   return useDogsState().liked.includes(id);
 }
 
-/** Most-liked first; ties keep the oldest profile first. */
 export function rankByLikes(dogs: Dog[]): Dog[] {
   return [...dogs].sort((a, b) => b.likes - a.likes || Number(a.id) - Number(b.id));
 }
@@ -204,7 +217,6 @@ export function useDogs(): Dog[] {
   return useDogsState().dogs;
 }
 
-/** The cached dog, fetched from the server if it isn't loaded yet. */
 export function useDog(id: string | undefined): { dog?: Dog; error?: string } {
   const { dogs } = useDogsState();
   const dog = dogs.find((d) => d.id === id);
@@ -239,7 +251,6 @@ const SWATCHES: [string, string][] = [
   ['blue', '#6f7d8c'],
 ];
 
-/** Picks up to two swatch colors for a free-text fur description like "Tan and white". */
 export function furSwatches(furColor?: string): string[] {
   const text = norm(furColor);
   if (!text) return [];

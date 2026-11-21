@@ -18,9 +18,7 @@ public record DogProfileResponse(
         String about,
         String pettingPolicy,
         String addedBy,
-        /** Account that owns the profile; null for unclaimed dogs. */
         Integer ownerId,
-        /** Last-seen location; both null when unknown. */
         Double latitude,
         Double longitude
 ) {

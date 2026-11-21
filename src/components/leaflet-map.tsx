@@ -5,7 +5,7 @@ import * as Location from 'expo-location';
 import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet';
+import { CircleMarker, MapContainer, Polyline, Popup, TileLayer, useMap } from 'react-leaflet';
 
 import { DOG_COLOR, ME_COLOR, WALKER_COLOR, type Coords, type LiveMapProps } from '@/components/live-map-types';
 import { SCU_CENTER } from '@/lib/geo';
@@ -21,7 +21,7 @@ function FlyTo({ focus }: { focus: LiveMapProps['focus'] }) {
   return null;
 }
 
-export function LeafletMap({ dogs, walkers, height, preview, onPress, focus }: LiveMapProps) {
+export function LeafletMap({ dogs, walkers, height, preview, onPress, focus, route }: LiveMapProps) {
   const [me, setMe] = useState<Coords | null>(null);
   const located = dogs.filter((d) => d.latitude !== undefined && d.longitude !== undefined);
 
@@ -72,6 +72,9 @@ export function LeafletMap({ dogs, walkers, height, preview, onPress, focus }: L
           </Popup>
         </CircleMarker>
       ))}
+      {route && route.length > 1 && (
+        <Polyline positions={route.map((p) => [p.latitude, p.longitude] as [number, number])} pathOptions={{ color: ME_COLOR, weight: 5 }} />
+      )}
       {walkers.map((w) => (
         <CircleMarker
           key={w.markerId}

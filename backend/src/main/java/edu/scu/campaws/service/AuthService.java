@@ -65,7 +65,6 @@ public class AuthService {
         return new AuthResponse(newToken(user), toResponse(user));
     }
 
-    /** Finds the user behind an "Authorization: Bearer ..." header, or throws a 401. */
     @Transactional(readOnly = true)
     public UserAccount currentUser(String header) {
         return tokens.findById(tokenFrom(header))

@@ -17,63 +17,46 @@ import java.util.NoSuchElementException;
 public class ApiExceptionHandler {
 
     @ExceptionHandler(IllegalArgumentException.class)
-    public ResponseEntity<Map<String, Object>> badRequest(
-            IllegalArgumentException exception) {
+    public ResponseEntity<Map<String, Object>> badRequest(IllegalArgumentException exception) {
         return response(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
-    public ResponseEntity<Map<String, Object>> unreadableBody(
-            HttpMessageNotReadableException exception) {
-        return response(
-                HttpStatus.BAD_REQUEST,
-                "Request body is missing or malformed."
-        );
+    public ResponseEntity<Map<String, Object>> unreadableBody(HttpMessageNotReadableException exception) {
+        return response(HttpStatus.BAD_REQUEST, "Request body is missing or malformed.");
     }
 
-    @ExceptionHandler({
-            MissingServletRequestParameterException.class,
-            MissingServletRequestPartException.class
-    })
+    @ExceptionHandler({MissingServletRequestParameterException.class, MissingServletRequestPartException.class})
     public ResponseEntity<Map<String, Object>> missingParameter(Exception exception) {
         return response(HttpStatus.BAD_REQUEST, exception.getMessage());
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
-    public ResponseEntity<Map<String, Object>> tooLarge(
-            MaxUploadSizeExceededException exception) {
-        return response(
-                HttpStatus.CONTENT_TOO_LARGE,
-                "Photos must be 10 MB or smaller."
-        );
+    public ResponseEntity<Map<String, Object>> tooLarge(MaxUploadSizeExceededException exception) {
+        return response(HttpStatus.CONTENT_TOO_LARGE, "Photos must be 10 MB or smaller.");
     }
 
     @ExceptionHandler(NoSuchElementException.class)
-    public ResponseEntity<Map<String, Object>> notFound(
-            NoSuchElementException exception) {
+    public ResponseEntity<Map<String, Object>> notFound(NoSuchElementException exception) {
         return response(HttpStatus.NOT_FOUND, exception.getMessage());
     }
 
     @ExceptionHandler(UnauthorizedException.class)
-    public ResponseEntity<Map<String, Object>> unauthorized(
-            UnauthorizedException exception) {
+    public ResponseEntity<Map<String, Object>> unauthorized(UnauthorizedException exception) {
         return response(HttpStatus.UNAUTHORIZED, exception.getMessage());
     }
 
     @ExceptionHandler(SecurityException.class)
-    public ResponseEntity<Map<String, Object>> forbidden(
-            SecurityException exception) {
+    public ResponseEntity<Map<String, Object>> forbidden(SecurityException exception) {
         return response(HttpStatus.FORBIDDEN, exception.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
-    public ResponseEntity<Map<String, Object>> conflict(
-            IllegalStateException exception) {
+    public ResponseEntity<Map<String, Object>> conflict(IllegalStateException exception) {
         return response(HttpStatus.CONFLICT, exception.getMessage());
     }
 
-    private ResponseEntity<Map<String, Object>> response(
-            HttpStatus status, String message) {
+    private ResponseEntity<Map<String, Object>> response(HttpStatus status, String message) {
         return ResponseEntity.status(status).body(Map.<String, Object>of(
                 "timestamp", Instant.now().toString(),
                 "status", status.value(),

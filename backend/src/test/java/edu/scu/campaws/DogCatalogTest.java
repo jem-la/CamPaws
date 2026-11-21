@@ -16,7 +16,6 @@ import java.util.NoSuchElementException;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** DogCatalog against a real PostgreSQL + PostGIS database. */
 @SpringBootTest
 @Import(PostgisTestDatabase.class)
 @Testcontainers(disabledWithoutDocker = true)
@@ -34,7 +33,6 @@ class DogCatalogTest {
     void emptyDatabase() {
         repository.deleteAll();
     }
-
 
     private DogProfile store(String name, boolean pet, Double lat, Double lon) {
         DogProfile dog = catalog.newDog(name, "Friendly", pet, "Daily");

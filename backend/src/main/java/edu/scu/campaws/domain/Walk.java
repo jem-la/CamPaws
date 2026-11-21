@@ -10,9 +10,7 @@ public class Walk {
 
     public Walk(int walkId) {
         if (walkId <= 0) {
-            throw new IllegalArgumentException(
-                    "Walk ID must be positive."
-            );
+            throw new IllegalArgumentException("Walk ID must be positive.");
         }
 
         this.walkId = walkId;
@@ -20,15 +18,11 @@ public class Walk {
 
     public void startWalk(LocalDateTime time) {
         if (time == null) {
-            throw new IllegalArgumentException(
-                    "Start time cannot be null."
-            );
+            throw new IllegalArgumentException("Start time cannot be null.");
         }
 
         if (startTime != null) {
-            throw new IllegalStateException(
-                    "This walk has already been started."
-            );
+            throw new IllegalStateException("This walk has already been started.");
         }
 
         startTime = time;
@@ -36,27 +30,19 @@ public class Walk {
 
     public void endWalk(LocalDateTime time) {
         if (time == null) {
-            throw new IllegalArgumentException(
-                    "End time cannot be null."
-            );
+            throw new IllegalArgumentException("End time cannot be null.");
         }
 
         if (startTime == null) {
-            throw new IllegalStateException(
-                    "The walk must be started first."
-            );
+            throw new IllegalStateException("The walk must be started first.");
         }
 
         if (endTime != null) {
-            throw new IllegalStateException(
-                    "This walk has already ended."
-            );
+            throw new IllegalStateException("This walk has already ended.");
         }
 
         if (time.isBefore(startTime)) {
-            throw new IllegalArgumentException(
-                    "End time cannot be before start time."
-            );
+            throw new IllegalArgumentException("End time cannot be before start time.");
         }
 
         endTime = time;
@@ -68,9 +54,7 @@ public class Walk {
 
     public long getDurationMinutes() {
         if (startTime == null || endTime == null) {
-            throw new IllegalStateException(
-                    "A completed walk is required to calculate duration."
-            );
+            throw new IllegalStateException("A completed walk is required to calculate duration.");
         }
 
         return Duration.between(startTime, endTime).toMinutes();

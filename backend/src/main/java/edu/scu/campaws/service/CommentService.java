@@ -10,7 +10,6 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
 import java.util.NoSuchElementException;
 
-/** Comments on dog profiles. Anyone logged in can comment; only the author can delete a comment. */
 @Service
 public class CommentService {
     static final int MAX_LENGTH = 500;
@@ -36,7 +35,6 @@ public class CommentService {
         this.catalog = catalog;
     }
 
-    /** Oldest first, like a conversation. */
     @Transactional(readOnly = true)
     public List<CommentResponse> forDog(int dogId) {
         catalog.requireById(dogId);

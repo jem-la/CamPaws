@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { RED } from '@/components/dog-profile-card';
 import { Field, PrimaryButton } from '@/components/form-field';
-import { changePassword, deleteAccount, logOut, updateProfile, useUser } from '@/lib/auth-store';
+import { changePassword, deleteAccount, logOut, updateProfile, useAuth, useUser } from '@/lib/auth-store';
 import { showAlert } from '@/lib/confirm';
 import { refreshDogs, useDogsState } from '@/lib/dogs-store';
 
@@ -19,6 +19,12 @@ const LINKS: { label: string; href: Href }[] = [
 type Panel = 'none' | 'edit' | 'password' | 'delete';
 
 export default function ProfileScreen() {
+  // Render nothing for the moment between logging out (or restoring a session) and the screen unmounting.
+  const { user } = useAuth();
+  return user ? <ProfileContent /> : null;
+}
+
+function ProfileContent() {
   const user = useUser();
   const { dogs } = useDogsState();
   const [panel, setPanel] = useState<Panel>('none');

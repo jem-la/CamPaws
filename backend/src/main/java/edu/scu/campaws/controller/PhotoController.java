@@ -30,11 +30,7 @@ public class PhotoController {
         this.auth = auth;
     }
 
-    /**
-     * Uploads one photo (multipart field "file") and returns the URL to put in a dog
-     * profile's photoUrls. The URL uses the host the client called, so it works from a phone
-     * on the same network as well as from localhost.
-     */
+    // URL is built from the request host so it works from a phone on the same network.
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @ResponseStatus(HttpStatus.CREATED)
     public PhotoUploadResponse upload(

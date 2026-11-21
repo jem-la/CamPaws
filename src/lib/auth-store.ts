@@ -7,7 +7,7 @@ import { loadToken, saveToken } from '@/lib/session';
 export type AuthState = {
   status: 'loading' | 'signedOut' | 'signedIn';
   user?: UserDto;
-  /** Set when restoring the saved session failed for a reason other than "logged out". */
+  // Set when restoring the session failed for a reason other than being logged out.
   error?: string;
 };
 
@@ -24,26 +24,33 @@ const subscribe = (l: () => void) => {
 
 export const useAuth = (): AuthState => useSyncExternalStore(subscribe, () => state, () => state);
 
-/** The signed-in user. Only call from screens shown after login. */
 export function useUser(): UserDto {
   const { user } = useAuth();
   if (!user) throw new Error('Not signed in');
   return user;
 }
 
-/** Checks the saved token on app start. */
+const MAX_RETRIES = 20;
+const RETRY_DELAY_MS = 2000;
+
 export async function restoreSession(): Promise<void> {
   setState({ status: 'loading' });
   const token = await loadToken();
   if (!token) return setState({ status: 'signedOut' });
-  try {
-    setState({ status: 'signedIn', user: await api.me() });
-  } catch (e) {
-    if (e instanceof ApiError && e.status === 401) {
-      await saveToken(null);
-      setState({ status: 'signedOut' });
-    } else {
-      setState({ status: 'signedOut', error: (e as Error).message });
+  // `npm run dev` starts Expo before the backend finishes booting, so retry while it comes up.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return setState({ status: 'signedIn', user: await api.me() });
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) {
+        await saveToken(null);
+        return setState({ status: 'signedOut' });
+      }
+      const offline = e instanceof ApiError && e.status === undefined;
+      if (!offline || attempt >= MAX_RETRIES) {
+        return setState({ status: 'signedOut', error: (e as Error).message });
+      }
+      await new Promise((resolve) => setTimeout(resolve, RETRY_DELAY_MS));
     }
   }
 }
@@ -74,7 +81,7 @@ export async function logOut(): Promise<void> {
   try {
     await api.logout();
   } catch {
-    // Signing out locally is enough if the server can't be reached.
+    // Logging out locally is enough if the server is unreachable.
   }
   await endSession();
 }

@@ -30,6 +30,9 @@ dependencies {
     runtimeOnly 'org.flywaydb:flyway-database-postgresql'
     runtimeOnly 'org.postgresql:postgresql'
 
+    // Runs the image-embedding model (models/dinov2-small.onnx) used to recognise dogs from photos.
+    implementation 'com.microsoft.onnxruntime:onnxruntime:1.20.0'
+
     // Starts the database in compose.yaml automatically on ./gradlew bootRun (needs Docker).
     developmentOnly 'org.springframework.boot:spring-boot-docker-compose'
 

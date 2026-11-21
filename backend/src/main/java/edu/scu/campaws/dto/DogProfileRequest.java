@@ -2,10 +2,6 @@ package edu.scu.campaws.dto;
 
 import java.util.List;
 
-/**
- * Body for creating or updating a dog profile. Only {@code name} and at least one photo
- * (via {@code photoUrls}, or the older single {@code photoUrl}) are required.
- */
 public record DogProfileRequest(
         String name,
         String temperament,
@@ -18,11 +14,9 @@ public record DogProfileRequest(
         String about,
         String pettingPolicy,
         String addedBy,
-        /** Where the dog was last seen. Send both, or neither. */
         Double latitude,
         Double longitude
 ) {
-    /** Photos to save: {@code photoUrls} when given, otherwise the single {@code photoUrl}. */
     public List<String> photos() {
         if (photoUrls != null && !photoUrls.isEmpty()) {
             return photoUrls;

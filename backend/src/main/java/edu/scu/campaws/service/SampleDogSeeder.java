@@ -12,29 +12,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/**
- * Fills an empty database with sample campus dogs on startup so the app has something
- * to show. Turn off with {@code campaws.seed.enabled=false}.
- */
+/** Seeds an empty database with sample dogs. Disable with campaws.seed.enabled=false. */
 @Component
 @ConditionalOnProperty(name = "campaws.seed.enabled", havingValue = "true", matchIfMissing = true)
 public class SampleDogSeeder implements ApplicationRunner {
     private static final Logger log = LoggerFactory.getLogger(SampleDogSeeder.class);
 
-    /** One sample dog. Coordinates are spots around Santa Clara University. */
-    private record Sample(
-            String name,
-            String furColor,
-            String temperament,
-            String pettingPolicy,
-            String campusFrequency,
-            String location,
-            String about,
-            int likes,
-            double latitude,
-            double longitude,
-            String addedBy,
-            List<String> photoUrls) { }
+    private record Sample(String name, String furColor, String temperament, String pettingPolicy,
+                          String campusFrequency, String location, String about, int likes,
+                          double latitude, double longitude, String addedBy, List<String> photoUrls) { }
 
     private static final String ALEX = "Alex Lee";
 
@@ -69,7 +55,6 @@ public class SampleDogSeeder implements ApplicationRunner {
         this.catalog = catalog;
     }
 
-    /** Runs once on an empty database; existing data is never touched. */
     @Override
     @Transactional
     public void run(ApplicationArguments args) {
@@ -79,10 +64,7 @@ public class SampleDogSeeder implements ApplicationRunner {
 
         for (Sample s : SAMPLES) {
             DogProfile dog = catalog.newDog(
-                    s.name(),
-                    s.temperament(),
-                    "yes".equals(s.pettingPolicy()),
-                    s.campusFrequency());
+                    s.name(), s.temperament(), "yes".equals(s.pettingPolicy()), s.campusFrequency());
             dog.setLastSeenLocation(s.latitude(), s.longitude());
             dog.inputAppearance(s.furColor(), s.location(), s.about(), s.pettingPolicy());
             dog.setPhotoUrls(s.photoUrls());
@@ -92,7 +74,6 @@ public class SampleDogSeeder implements ApplicationRunner {
             }
             catalog.addDog(dog);
         }
-
         log.info("Seeded {} sample dogs.", SAMPLES.size());
     }
 }
