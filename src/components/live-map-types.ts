@@ -11,6 +11,8 @@ export type LiveMapProps = {
   preview?: boolean;
   onPress?: () => void;
   /** Move the map to show this spot. */
+  /** The signed-in user's own walk path, drawn as a line. Never shared with anyone. */
+  route?: Coords[];
   focus?: Coords & { radiusMeters: number };
 };
 

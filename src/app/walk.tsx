@@ -5,6 +5,7 @@ import { Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-nat
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { PrimaryButton, RED } from '@/components/form-field';
+import { LiveMap } from '@/components/live-map';
 import { api, type StartWalkDto, type WalkStatsDto, type WalkSummaryDto } from '@/lib/api';
 import { useAuth } from '@/lib/auth-store';
 import { showAlert } from '@/lib/confirm';
@@ -16,6 +17,7 @@ type Active = { dogId: number; dogName: string; startedAt: Date; publicSharing: 
 
 const MAX_ACCURACY_M = 25; // ignore readings less precise than this (indoors GPS is often worse)
 const MIN_STEP_M = 5; // GPS wobbles a few meters even when standing still
+const SHARE_EVERY_MS = 3 * 60 * 1000; // public walks update their map pin at most this often
 
 export default function WalkScreen() {
   const dogs = useDogs();
@@ -25,6 +27,9 @@ export default function WalkScreen() {
   const [active, setActive] = useState<Active | null>(null);
   const [meters, setMeters] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  // Your own path. Kept only on this phone and drawn on your screen; it is never sent to the server.
+  const [route, setRoute] = useState<Point[]>([]);
+  const lastShared = useRef(0);
   const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<WalkSummaryDto | null>(null);
   const [stats, setStats] = useState<WalkStatsDto | null>(null);
@@ -43,6 +48,11 @@ export default function WalkScreen() {
     [dogs, user],
   );
   const selected = sorted.find((d) => d.id === dogId) ?? sorted[0];
+
+  const focus = useMemo(() => {
+    const here = route[route.length - 1];
+    return here ? { ...here, radiusMeters: 150 } : undefined;
+  }, [route]);
 
   const loadStats = useCallback(() => {
     api
@@ -81,9 +91,12 @@ export default function WalkScreen() {
       setMeters(distance.current);
     }
     last.current = point;
+    setRoute((r) => [...r, point]);
 
     const walk = activeRef.current;
-    if (walk?.session && walk.publicSharing) {
+    // Others only see a rounded pin that refreshes about every 3 minutes, never the path.
+    if (walk?.session && walk.publicSharing && Date.now() - lastShared.current >= SHARE_EVERY_MS) {
+      lastShared.current = Date.now();
       api.updateWalkLocation(walk.session.walkId, latitude, longitude).catch(() => undefined);
     }
   };
@@ -108,6 +121,8 @@ export default function WalkScreen() {
         if (share) throw e; // sharing was requested, so don't silently walk privately
       }
       distance.current = 0;
+      lastShared.current = Date.now(); // startWalk already sent the first position
+      setRoute([{ latitude: first.coords.latitude, longitude: first.coords.longitude }]);
       // Start measuring from the first accurate reading, not this quick (less accurate) fix.
       last.current = null;
       setMeters(0);
@@ -169,9 +184,17 @@ export default function WalkScreen() {
             <Text style={styles.live}>● Walking {active.dogName}</Text>
             <Text style={styles.big}>{formatDuration(elapsed)}</Text>
             <Text style={styles.bigSub}>{formatDistance(meters)}</Text>
+            <LiveMap
+              dogs={[]}
+              walkers={[]}
+              route={route}
+              height={260}
+              focus={focus}
+            />
+            <Text style={styles.note}>The green line is your path. Only you can see it.</Text>
             <Text style={styles.note}>
               {active.publicSharing
-                ? 'Your approximate area is visible on the campus map. Keep CamPaws open while you walk.'
+                ? 'Your approximate area is visible on the campus map and refreshes about every 3 minutes. Keep CamPaws open while you walk.'
                 : 'Private walk: your location is not shared. Keep CamPaws open while you walk.'}
             </Text>
             <PrimaryButton label="End walk" tone="danger" onPress={confirmEnd} busy={busy} />

@@ -26,7 +26,6 @@ public class WalkController {
         this.history = history;
     }
 
-    /** Saves a finished walk to the signed-in user's history. */
     @PostMapping("/history")
     @ResponseStatus(HttpStatus.CREATED)
     public WalkSummary saveWalk(
@@ -45,22 +44,12 @@ public class WalkController {
     public StartWalkResponse startWalk(
             @RequestHeader(name = "Authorization", required = false) String authorization,
             @RequestBody StartWalkRequest request) {
-
         int userId = auth.currentUser(authorization).getUserId();
-
         if (request == null) {
-            throw new IllegalArgumentException(
-                    "Walk details are required."
-            );
+            throw new IllegalArgumentException("Walk details are required.");
         }
-
         return sessions.startWalk(
-                userId,
-                request.dogId(),
-                request.publicSharing(),
-                request.latitude(),
-                request.longitude()
-        );
+                userId, request.dogId(), request.publicSharing(), request.latitude(), request.longitude());
     }
 
     @PutMapping("/{walkId}/location")
@@ -69,19 +58,11 @@ public class WalkController {
             @RequestHeader(name = "Authorization", required = false) String authorization,
             @PathVariable int walkId,
             @RequestBody WalkLocationUpdateRequest request) {
-
         if (request == null) {
-            throw new IllegalArgumentException(
-                    "Coordinates are required."
-            );
+            throw new IllegalArgumentException("Coordinates are required.");
         }
-
         sessions.updateLocation(
-                walkId,
-                auth.currentUser(authorization).getUserId(),
-                request.latitude(),
-                request.longitude()
-        );
+                walkId, auth.currentUser(authorization).getUserId(), request.latitude(), request.longitude());
     }
 
     @PostMapping("/{walkId}/end")
@@ -89,7 +70,6 @@ public class WalkController {
     public void endWalk(
             @RequestHeader(name = "Authorization", required = false) String authorization,
             @PathVariable int walkId) {
-
         sessions.endWalk(walkId, auth.currentUser(authorization).getUserId());
     }
 }

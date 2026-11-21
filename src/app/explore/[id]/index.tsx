@@ -16,7 +16,7 @@ import { DogComments } from '@/components/dog-comments';
 import { RED } from '@/components/dog-form';
 import { useAuth } from '@/lib/auth-store';
 import { showAlert } from '@/lib/confirm';
-import { dogTint, furSwatches, PETTING_LABELS, toggleLike, useDog, useLiked } from '@/lib/dogs-store';
+import { deleteDog, dogTint, furSwatches, PETTING_LABELS, toggleLike, useDog, useLiked } from '@/lib/dogs-store';
 
 export default function DogProfileScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -40,6 +40,19 @@ export default function DogProfileScreen() {
 
   const photoWidth = Math.min(width, 480) - 40;
   const swatches = furSwatches(dog.furColor);
+  const isOwner = dog.ownerId !== undefined && dog.ownerId === user?.userId;
+  const confirmDelete = () =>
+    showAlert(`Delete ${dog.name}?`, 'This removes the profile, its likes and comments. This can’t be undone.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () =>
+          deleteDog(dog.id)
+            .then(() => (router.canGoBack() ? router.back() : router.replace('/explore')))
+            .catch((e: Error) => showAlert('Couldn’t delete profile', e.message)),
+      },
+    ]);
   const tags = [dog.temperament, dog.petting === 'ask' ? 'Ask before petting' : `Petting: ${PETTING_LABELS[dog.petting]}`];
 
   return (
@@ -53,14 +66,14 @@ export default function DogProfileScreen() {
         options={{
           title: 'Dog profile',
           headerRight: () =>
-            dog.ownerId !== undefined && dog.ownerId === user?.userId ? (
-            <Pressable
-              hitSlop={10}
-              accessibilityRole="button"
-              accessibilityLabel={`Edit ${dog.name}`}
-              onPress={() => router.push({ pathname: '/explore/[id]/edit', params: { id: dog.id } })}>
-              <Text style={styles.headerAction}>Edit</Text>
-            </Pressable>
+            isOwner ? (
+              <Pressable
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={`Edit ${dog.name}`}
+                onPress={() => router.push({ pathname: '/explore/[id]/edit', params: { id: dog.id } })}>
+                <Text style={styles.headerAction}>Edit</Text>
+              </Pressable>
             ) : null,
         }}
       />
@@ -136,6 +149,12 @@ export default function DogProfileScreen() {
       <View onLayout={(e) => setCommentsY(e.nativeEvent.layout.y)}>
         <DogComments dogId={dog.id} onCountChange={setCommentCount} />
       </View>
+
+      {isOwner && (
+        <Pressable style={styles.deleteButton} accessibilityRole="button" accessibilityLabel={`Delete ${dog.name}`} onPress={confirmDelete}>
+          <Text style={styles.deleteText}>Delete this dog profile</Text>
+        </Pressable>
+      )}
     </ScrollView>
   );
 }
@@ -180,4 +199,6 @@ const styles = StyleSheet.create({
   tagTextPrimary: { color: RED, fontWeight: '600' },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 16 },
   meta: { fontSize: 12, color: '#8f878d' },
+  deleteButton: { marginTop: 28, height: 46, borderRadius: 12, borderWidth: 1, borderColor: '#b3182d', alignItems: 'center', justifyContent: 'center' },
+  deleteText: { color: '#b3182d', fontSize: 14, fontWeight: '700' },
 });

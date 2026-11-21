@@ -43,13 +43,11 @@ public class AuthController {
         auth.logout(authorization);
     }
 
-    /** Step 1 of password reset: returns the account's security question. */
     @GetMapping("/auth/reset-question")
     public QuestionResponse resetQuestion(@RequestParam String email) {
         return new QuestionResponse(auth.resetQuestion(email));
     }
 
-    /** Step 2 of password reset: checks the answer and sets the new password. */
     @PostMapping("/auth/reset-password")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void resetPassword(@RequestBody ResetPasswordRequest request) {

@@ -16,11 +16,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 
-/**
- * A campus dog. Stored in the {@code dogs} table (see db/migration). The last-seen
- * latitude/longitude also feed a PostGIS {@code last_seen_point} column used for
- * nearby-dog queries; that column is computed by the database, not mapped here.
- */
+// last_seen_point (PostGIS) is computed by the database from the lat/lng columns, so it is not mapped here.
 @Entity
 @Table(name = "dogs")
 public class DogProfile {
@@ -61,7 +57,6 @@ public class DogProfile {
     @Column(name = "fur_color", length = 120)
     private String furColor;
 
-    /** Human-readable spot such as "Library lawn". */
     @Column(length = 120)
     private String location;
 
@@ -74,26 +69,16 @@ public class DogProfile {
     @Column(name = "added_by", length = 120)
     private String addedBy;
 
-    /** The account that created this dog; null for sample dogs and after the owner deletes their account. */
+    // null for sample dogs and after the owner deletes their account
     @Column(name = "owner_id")
     private Integer ownerId;
 
-    /** Required by JPA. */
     protected DogProfile() {
     }
 
-    /** A profile without a known location. */
-    public DogProfile(
-            int dogId,
-            String name,
-            String temperament,
-            boolean canBePetted,
-            String campusFrequency) {
-
+    public DogProfile(int dogId, String name, String temperament, boolean canBePetted, String campusFrequency) {
         if (dogId <= 0) {
-            throw new IllegalArgumentException(
-                    "Dog ID must be positive."
-            );
+            throw new IllegalArgumentException("Dog ID must be positive.");
         }
 
         validateName(name);
@@ -107,19 +92,9 @@ public class DogProfile {
         this.pettingPolicy = canBePetted ? "yes" : "ask";
     }
 
-    /**
-     * A profile last seen at the given coordinates. For backwards compatibility,
-     * (0, 0) means "location unknown".
-     */
-    public DogProfile(
-            int dogId,
-            String name,
-            String temperament,
-            boolean canBePetted,
-            String campusFrequency,
-            double lastSeenLatitude,
-            double lastSeenLongitude) {
-
+    // (0, 0) means "location unknown"
+    public DogProfile(int dogId, String name, String temperament, boolean canBePetted,
+                      String campusFrequency, double lastSeenLatitude, double lastSeenLongitude) {
         this(dogId, name, temperament, canBePetted, campusFrequency);
         validateCoordinates(lastSeenLatitude, lastSeenLongitude);
 
@@ -129,16 +104,8 @@ public class DogProfile {
         }
     }
 
-    /**
-     * Sets the descriptive fields shown on the profile page. All are optional.
-     * {@code pettingPolicy} is one of "ask", "yes" or "no"; null keeps it derived from canBePetted.
-     */
-    public void inputAppearance(
-            String furColor,
-            String location,
-            String about,
-            String pettingPolicy) {
-
+    // A null pettingPolicy keeps it derived from canBePetted.
+    public void inputAppearance(String furColor, String location, String about, String pettingPolicy) {
         this.furColor = normalizeOptional(furColor);
         this.location = normalizeOptional(location);
         this.about = normalizeOptional(about);
@@ -146,9 +113,7 @@ public class DogProfile {
         if (pettingPolicy != null && !pettingPolicy.isBlank()) {
             String policy = pettingPolicy.trim().toLowerCase(Locale.ROOT);
             if (!PETTING_POLICIES.contains(policy)) {
-                throw new IllegalArgumentException(
-                        "Petting policy must be one of ask, yes or no."
-                );
+                throw new IllegalArgumentException("Petting policy must be one of ask, yes or no.");
             }
             this.pettingPolicy = policy;
             this.canBePetted = policy.equals("yes");
@@ -157,12 +122,7 @@ public class DogProfile {
         }
     }
 
-    public void inputDetails(
-            String name,
-            String temperament,
-            boolean canBePetted,
-            String campusFrequency) {
-
+    public void inputDetails(String name, String temperament, boolean canBePetted, String campusFrequency) {
         validateName(name);
 
         this.name = name.trim();
@@ -171,9 +131,7 @@ public class DogProfile {
         this.campusFrequency = normalizeOptional(campusFrequency);
     }
 
-    /**
-     * Records where the dog was last seen. Pass both values, or both null to clear it.
-     */
+    // Pass both values, or both null to clear.
     public void setLastSeenLocation(Double latitude, Double longitude) {
         if (latitude == null && longitude == null) {
             this.lastSeenLatitude = null;
@@ -182,9 +140,7 @@ public class DogProfile {
         }
 
         if (latitude == null || longitude == null) {
-            throw new IllegalArgumentException(
-                    "Latitude and longitude must be given together."
-            );
+            throw new IllegalArgumentException("Latitude and longitude must be given together.");
         }
 
         validateCoordinates(latitude, longitude);
@@ -196,15 +152,12 @@ public class DogProfile {
         return "Name: " + name
                 + ", Temperament: " + displayOptional(temperament)
                 + ", Can be petted: " + canBePetted
-                + ", Campus frequency: "
-                + displayOptional(campusFrequency);
+                + ", Campus frequency: " + displayOptional(campusFrequency);
     }
 
     public void addLike() {
         if (likeCount == Integer.MAX_VALUE) {
-            throw new IllegalStateException(
-                    "Like count has reached its maximum value."
-            );
+            throw new IllegalStateException("Like count has reached its maximum value.");
         }
 
         likeCount++;
@@ -230,12 +183,10 @@ public class DogProfile {
         return campusFrequency;
     }
 
-    /** Null when the location is unknown. */
     public Double getLastSeenLatitude() {
         return lastSeenLatitude;
     }
 
-    /** Null when the location is unknown. */
     public Double getLastSeenLongitude() {
         return lastSeenLongitude;
     }
@@ -248,7 +199,7 @@ public class DogProfile {
         return likeCount;
     }
 
-    /** The profile photo: the first of {@link #getPhotoUrls()}. */
+    // the profile photo is the first photo
     public String getPhotoUrl() {
         return photoUrls.isEmpty() ? null : photoUrls.get(0);
     }
@@ -257,18 +208,13 @@ public class DogProfile {
         setPhotoUrls(photoUrl == null ? null : List.of(photoUrl));
     }
 
-    /** Replaces the dog's photos. The first URL becomes the profile photo. */
     public void setPhotoUrls(List<String> photoUrls) {
         if (photoUrls == null || photoUrls.isEmpty()) {
-            throw new IllegalArgumentException(
-                    "At least one dog photo URL is required."
-            );
+            throw new IllegalArgumentException("At least one dog photo URL is required.");
         }
 
         if (photoUrls.size() > MAX_PHOTOS) {
-            throw new IllegalArgumentException(
-                    "A dog profile can have at most " + MAX_PHOTOS + " photos."
-            );
+            throw new IllegalArgumentException("A dog profile can have at most " + MAX_PHOTOS + " photos.");
         }
 
         List<String> normalized = new ArrayList<>();
@@ -319,26 +265,18 @@ public class DogProfile {
 
     private static String normalizePhotoUrl(String photoUrl) {
         if (photoUrl == null || photoUrl.isBlank()) {
-            throw new IllegalArgumentException(
-                    "At least one dog photo URL is required."
-            );
+            throw new IllegalArgumentException("At least one dog photo URL is required.");
         }
 
         String normalized = photoUrl.trim();
 
-        if (!(normalized.regionMatches(
-                true, 0, "https://", 0, 8)
-                || normalized.regionMatches(
-                true, 0, "http://", 0, 7))) {
-            throw new IllegalArgumentException(
-                    "Photo URL must start with http:// or https://."
-            );
+        if (!(normalized.regionMatches(true, 0, "https://", 0, 8)
+                || normalized.regionMatches(true, 0, "http://", 0, 7))) {
+            throw new IllegalArgumentException("Photo URL must start with http:// or https://.");
         }
 
         if (normalized.length() > 2048) {
-            throw new IllegalArgumentException(
-                    "Photo URL must be at most 2048 characters."
-            );
+            throw new IllegalArgumentException("Photo URL must be at most 2048 characters.");
         }
 
         return normalized;
@@ -350,26 +288,17 @@ public class DogProfile {
         }
 
         if (name.trim().length() > 80) {
-            throw new IllegalArgumentException(
-                    "Dog name must be at most 80 characters."
-            );
+            throw new IllegalArgumentException("Dog name must be at most 80 characters.");
         }
     }
 
-    public static void validateCoordinates(
-            double latitude, double longitude) {
-        if (!Double.isFinite(latitude)
-                || latitude < -90 || latitude > 90) {
-            throw new IllegalArgumentException(
-                    "Latitude must be between -90 and 90."
-            );
+    public static void validateCoordinates(double latitude, double longitude) {
+        if (!Double.isFinite(latitude) || latitude < -90 || latitude > 90) {
+            throw new IllegalArgumentException("Latitude must be between -90 and 90.");
         }
 
-        if (!Double.isFinite(longitude)
-                || longitude < -180 || longitude > 180) {
-            throw new IllegalArgumentException(
-                    "Longitude must be between -180 and 180."
-            );
+        if (!Double.isFinite(longitude) || longitude < -180 || longitude > 180) {
+            throw new IllegalArgumentException("Longitude must be between -180 and 180.");
         }
     }
 
@@ -381,9 +310,7 @@ public class DogProfile {
         String trimmed = value.trim();
 
         if (trimmed.length() > 120) {
-            throw new IllegalArgumentException(
-                    "Optional dog profile fields must be at most 120 characters."
-            );
+            throw new IllegalArgumentException("Optional dog profile fields must be at most 120 characters.");
         }
 
         return trimmed;

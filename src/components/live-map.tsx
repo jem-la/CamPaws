@@ -1,13 +1,13 @@
 import { router } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Pressable, View } from 'react-native';
-import MapView, { Marker, PROVIDER_DEFAULT } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 
-import { DOG_COLOR, WALKER_COLOR, type LiveMapProps } from '@/components/live-map-types';
+import { DOG_COLOR, ME_COLOR, WALKER_COLOR, type LiveMapProps } from '@/components/live-map-types';
 import { SCU_CENTER } from '@/lib/geo';
 
 /** Phone map (Apple Maps on iOS, Google Maps on Android). The web version is live-map.web.tsx. */
-export function LiveMap({ dogs, walkers, height, preview, onPress, focus }: LiveMapProps) {
+export function LiveMap({ dogs, walkers, height, preview, onPress, focus, route }: LiveMapProps) {
   const mapRef = useRef<MapView>(null);
   const located = dogs.filter((d) => d.latitude !== undefined && d.longitude !== undefined);
 
@@ -40,6 +40,9 @@ export function LiveMap({ dogs, walkers, height, preview, onPress, focus }: Live
           onCalloutPress={() => router.push({ pathname: '/explore/[id]', params: { id: d.id } })}
         />
       ))}
+      {route && route.length > 1 && (
+        <Polyline coordinates={route} strokeColor={ME_COLOR} strokeWidth={5} lineCap="round" lineJoin="round" />
+      )}
       {walkers.map((w) => (
         <Marker
           key={w.markerId}

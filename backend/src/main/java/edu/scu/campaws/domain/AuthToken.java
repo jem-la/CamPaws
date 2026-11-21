@@ -5,7 +5,6 @@ import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 
-/** A login session. The app sends the token in the "Authorization: Bearer ..." header. */
 @Entity
 @Table(name = "auth_tokens")
 public class AuthToken {

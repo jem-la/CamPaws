@@ -9,7 +9,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
-/** Per-user likes: a user can like a dog once and unlike it again. */
 @Service
 public class LikeService {
     private final JdbcTemplate jdbc;
@@ -45,6 +44,7 @@ public class LikeService {
 
     @Transactional(readOnly = true)
     public List<Integer> likedDogIds(int userId) {
-        return jdbc.queryForList("SELECT dog_id FROM dog_likes WHERE user_id = ? ORDER BY dog_id", Integer.class, userId);
+        return jdbc.queryForList(
+                "SELECT dog_id FROM dog_likes WHERE user_id = ? ORDER BY dog_id", Integer.class, userId);
     }
 }

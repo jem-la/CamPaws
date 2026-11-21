@@ -1,6 +1,5 @@
 package edu.scu.campaws.dto;
 
-/** Request and response bodies for /api/auth and /api/me. */
 public final class AuthDtos {
     private AuthDtos() { }
 

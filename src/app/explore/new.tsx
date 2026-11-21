@@ -4,17 +4,18 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { DogForm, EMPTY_DOG, RED } from '@/components/dog-form';
 import { showAlert } from '@/lib/confirm';
-import { createDog, type Dog, type DogInput, findDuplicates } from '@/lib/dogs-store';
+import { createDog, type Dog, type DogInput, findDuplicates, findPhotoMatch } from '@/lib/dogs-store';
 
 const isDirty = (v: DogInput) =>
   v.photos.length > 0 ||
   [v.name, v.furColor, v.temperament, v.campusVisits, v.location, v.about].some((f) => f?.trim()) ||
   v.petting !== EMPTY_DOG.petting;
 
-/** The duplicate we suggested, and the name/fur color it was found for. */
-type Suggestion = { dog: Dog; name: string; furColor: string };
+// The suggested duplicate, plus the form values it was found for.
+type Suggestion = { dog: Dog; name: string; furColor: string; photos: string; similarity?: number };
 
 const key = (v?: string) => (v ?? '').trim().toLowerCase();
+const photosKey = (v: DogInput) => v.photos.join('|');
 
 export default function CreateDogScreen() {
   const params = useLocalSearchParams<{ name?: string }>();
@@ -22,7 +23,7 @@ export default function CreateDogScreen() {
   const [dirty, setDirty] = useState(false);
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null);
 
-  // Alternative flow 3: cancelling discards the draft and no profile is created.
+  // Confirm before discarding a draft.
   const disablePrevention = usePreventRemove(dirty, ({ repeat }) => {
     showAlert('Discard this dog?', 'Nothing will be saved.', [
       { text: 'Keep editing', style: 'cancel' },
@@ -37,12 +38,18 @@ export default function CreateDogScreen() {
   };
 
   const onSubmit = async (value: DogInput) => {
-    // Alternative flow 2: suggest an existing profile first. Once the user has seen the
-    // suggestion, submitting again creates a new profile anyway.
+    // Suggest an existing profile first. If they submit again after seeing it, create the new one anyway.
     if (!suggestion) {
+      const base = { name: key(value.name), furColor: key(value.furColor), photos: photosKey(value) };
+      // Check for a similar photo first, then for the same name and fur color.
+      const byPhoto = await findPhotoMatch(value.photos).catch(() => undefined);
+      if (byPhoto) {
+        setSuggestion({ ...base, dog: byPhoto.dog, similarity: byPhoto.similarity });
+        return;
+      }
       const [match] = await findDuplicates(value);
       if (match) {
-        setSuggestion({ dog: match, name: key(value.name), furColor: key(value.furColor) });
+        setSuggestion({ ...base, dog: match });
         return;
       }
     }
@@ -53,10 +60,14 @@ export default function CreateDogScreen() {
   const dup = suggestion?.dog;
   const notice = dup && (
     <View style={styles.notice} accessibilityRole="alert">
-      <Text style={styles.noticeTitle}>{dup.name} might already be on CamPaws</Text>
+      <Text style={styles.noticeTitle}>
+        {suggestion.similarity !== undefined
+          ? `This photo looks like ${dup.name} (${Math.round(suggestion.similarity * 100)}% match)`
+          : `${dup.name} might already be on CamPaws`}
+      </Text>
       <Text style={styles.noticeBody}>
         {[dup.furColor, dup.location && `usually near ${dup.location}`].filter(Boolean).join(' · ') ||
-          'A dog with this name already has a profile.'}
+          (suggestion.similarity !== undefined ? 'This dog already has a profile.' : 'A dog with this name already has a profile.')}
         {'\n'}Is this the same dog?
       </Text>
       <View style={styles.noticeActions}>
@@ -82,8 +93,11 @@ export default function CreateDogScreen() {
       notice={notice}
       onChange={(v) => {
         setDirty(isDirty(v));
-        // Changing the name or fur color means the suggestion may no longer apply.
-        if (suggestion && (key(v.name) !== suggestion.name || key(v.furColor) !== suggestion.furColor)) {
+        // The suggestion may not apply once the name, fur color or photos change.
+        if (
+          suggestion &&
+          (key(v.name) !== suggestion.name || key(v.furColor) !== suggestion.furColor || photosKey(v) !== suggestion.photos)
+        ) {
           setSuggestion(null);
         }
       }}

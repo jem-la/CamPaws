@@ -1,16 +1,18 @@
+import { fetch as expoFetch } from 'expo/fetch';
 import Constants from 'expo-constants';
+import { File } from 'expo-file-system';
+import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import { Platform } from 'react-native';
 
 import { getToken } from '@/lib/session';
 
 const BACKEND_PORT = 8080;
 const TIMEOUT_MS = 20000;
+const UPLOAD_TIMEOUT_MS = 90000;
+// Shrink photos before upload so they're quick on phone networks.
+const PHOTO_MAX_WIDTH = 1280;
 
-/**
- * Where the Spring backend lives. Set EXPO_PUBLIC_API_URL to override (e.g. a deployed server).
- * Otherwise use the same machine that serves the JS bundle, so a phone on the LAN running
- * Expo Go reaches the backend on the developer's computer.
- */
+// EXPO_PUBLIC_API_URL overrides this. Otherwise use the machine serving the JS bundle, so a phone on the LAN reaches the dev backend.
 export function apiBaseUrl(): string {
   const fromEnv = process.env.EXPO_PUBLIC_API_URL;
   if (fromEnv) return fromEnv.replace(/\/+$/, '');
@@ -32,12 +34,18 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+// Phone uploads need expo/fetch to send an expo-file-system File in the FormData.
+const sendMultipart = (url: string, init: RequestInit): Promise<Response> =>
+  expoFetch(url, init as Parameters<typeof expoFetch>[1]) as unknown as Promise<Response>;
+
+async function request<T>(path: string, init: RequestInit = {}, timeoutMs = TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  const base = apiBaseUrl();
   let res: Response;
   try {
-    res = await fetch(`${apiBaseUrl()}${path}`, {
+    const send = Platform.OS !== 'web' && init.body instanceof FormData ? sendMultipart : fetch;
+    res = await send(`${base}${path}`, {
       ...init,
       signal: controller.signal,
       headers: {
@@ -47,7 +55,12 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
       },
     });
   } catch {
-    throw new ApiError("Can't reach the CamPaws server. Check your connection and try again.");
+    const timedOut = controller.signal.aborted;
+    throw new ApiError(
+      timedOut
+        ? `The CamPaws server at ${base} took too long to respond. Check your connection and try again.`
+        : "Can't reach the CamPaws server.",
+    );
   } finally {
     clearTimeout(timer);
   }
@@ -77,7 +90,6 @@ const json = (method: string, body: unknown): RequestInit => ({
   body: JSON.stringify(body),
 });
 
-/** Mirrors backend DogProfileResponse. */
 export type DogProfileDto = {
   dogId: number;
   name: string;
@@ -92,14 +104,12 @@ export type DogProfileDto = {
   about: string | null;
   pettingPolicy: 'ask' | 'yes' | 'no' | null;
   addedBy: string | null;
-  /** Account that added the dog; null for unclaimed sample dogs. */
+  // null for unclaimed sample dogs
   ownerId: number | null;
-  /** Last-seen location (PostGIS-backed). Both null when unknown. */
   latitude: number | null;
   longitude: number | null;
 };
 
-/** Mirrors backend DogProfileRequest. */
 export type DogProfileRequestDto = {
   name: string;
   temperament?: string;
@@ -114,6 +124,8 @@ export type DogProfileRequestDto = {
   latitude?: number;
   longitude?: number;
 };
+
+export type DogPhotoMatchDto = { dog: DogProfileDto; similarity: number };
 
 export type UserDto = { userId: number; email: string; displayName: string };
 export type AuthDto = { token: string; user: UserDto };
@@ -197,7 +209,6 @@ export const api = {
   unlikeDog: (id: string) => request<DogProfileDto>(`/api/dogs/${encodeURIComponent(id)}/likes`, { method: 'DELETE' }),
 
   listDogs: (q?: string) => request<DogProfileDto[]>(`/api/dogs${q ? `?q=${encodeURIComponent(q)}` : ''}`),
-  /** Dogs last seen within radiusMeters (default 1 km) of a point, closest first. */
   nearbyDogs: (lat: number, lng: number, radiusMeters = 1000) =>
     request<DogProfileDto[]>(
       `/api/dogs/nearby?${new URLSearchParams({ lat: String(lat), lng: String(lng), radiusMeters: String(radiusMeters) })}`,
@@ -206,6 +217,7 @@ export const api = {
   createDog: (body: DogProfileRequestDto) => request<DogProfileDto>('/api/dogs', json('POST', body)),
   updateDog: (id: string, body: DogProfileRequestDto) =>
     request<DogProfileDto>(`/api/dogs/${encodeURIComponent(id)}`, json('PUT', body)),
+  deleteDog: (id: string) => request<void>(`/api/dogs/${encodeURIComponent(id)}`, { method: 'DELETE' }),
   likeDog: (id: string) => request<DogProfileDto>(`/api/dogs/${encodeURIComponent(id)}/likes`, { method: 'POST' }),
   findDuplicates: (name: string, furColor?: string, ignoreDogId?: string) => {
     const params = new URLSearchParams({ name });
@@ -213,31 +225,35 @@ export const api = {
     if (ignoreDogId) params.set('ignoreDogId', ignoreDogId);
     return request<DogProfileDto[]>(`/api/dogs/duplicates?${params.toString()}`);
   },
-  /** Uploads a local image (file://, content://, blob: or data: URI) and returns its public URL. */
   uploadPhoto: async (uri: string): Promise<string> => {
     if (/^https?:\/\//i.test(uri)) return uri;
-    const form = new FormData();
-    if (Platform.OS === 'web') {
-      const blob = await (await fetch(uri)).blob();
-      form.append('file', blob, `photo.${extensionFor(blob.type)}`);
-    } else {
-      const type = mimeFromUri(uri);
-      // React Native's FormData accepts { uri, name, type } file parts.
-      form.append('file', { uri, name: `photo.${extensionFor(type)}`, type } as unknown as Blob);
-    }
-    const { url } = await request<{ url: string }>('/api/photos', { method: 'POST', body: form });
+    const { url } = await request<{ url: string }>(
+      '/api/photos',
+      { method: 'POST', body: await photoForm(uri) },
+      UPLOAD_TIMEOUT_MS,
+    );
     return url;
   },
+  matchDogPhoto: async (uri: string) =>
+    request<DogPhotoMatchDto[]>('/api/dogs/match-photo', { method: 'POST', body: await photoForm(uri) }, UPLOAD_TIMEOUT_MS),
 };
 
-function mimeFromUri(uri: string): string {
-  const ext = uri.split('?')[0].split('.').pop()?.toLowerCase();
-  if (ext === 'png') return 'image/png';
-  if (ext === 'webp') return 'image/webp';
-  if (ext === 'heic') return 'image/heic';
-  if (ext === 'heif') return 'image/heif';
-  if (ext === 'gif') return 'image/gif';
-  return 'image/jpeg';
+async function photoForm(uri: string): Promise<FormData> {
+  const form = new FormData();
+  if (Platform.OS === 'web') {
+    const blob = await (await fetch(uri)).blob();
+    form.append('file', blob, `photo.${extensionFor(blob.type)}`);
+    return form;
+  }
+  let fileUri = uri;
+  try {
+    const ref = await ImageManipulator.manipulate(uri).resize({ width: PHOTO_MAX_WIDTH }).renderAsync();
+    fileUri = (await ref.saveAsync({ format: SaveFormat.JPEG, compress: 0.8 })).uri;
+  } catch {
+    // Use the original file if resizing fails.
+  }
+  form.append('file', new File(fileUri) as unknown as Blob);
+  return form;
 }
 
 function extensionFor(mime: string): string {

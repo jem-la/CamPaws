@@ -16,7 +16,6 @@ public class MapController {
         this.sessions = sessions;
     }
 
-
     @GetMapping("/dogs")
     public List<MapMarkerResponse> markers() {
         return sessions.markers();

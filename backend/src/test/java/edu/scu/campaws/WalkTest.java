@@ -3,7 +3,9 @@ package edu.scu.campaws;
 import edu.scu.campaws.domain.Walk;
 
 import org.junit.jupiter.api.Test;
+
 import java.time.LocalDateTime;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 class WalkTest {
@@ -41,15 +43,13 @@ class WalkTest {
         Walk w = new Walk(1);
         LocalDateTime s = LocalDateTime.of(2026, 10, 24, 10, 30);
         w.startWalk(s);
-        assertThrows(IllegalArgumentException.class,
-                () -> w.endWalk(s.minusMinutes(1)));
+        assertThrows(IllegalArgumentException.class, () -> w.endWalk(s.minusMinutes(1)));
     }
 
     @Test
     void rejectsEndWithoutStart() {
         Walk w = new Walk(1);
-        assertThrows(IllegalStateException.class,
-                () -> w.endWalk(LocalDateTime.now()));
+        assertThrows(IllegalStateException.class, () -> w.endWalk(LocalDateTime.now()));
     }
 
     @Test
@@ -63,8 +63,7 @@ class WalkTest {
 
     @Test
     void rejectsNullStartTime() {
-        assertThrows(IllegalArgumentException.class,
-                () -> new Walk(1).startWalk(null));
+        assertThrows(IllegalArgumentException.class, () -> new Walk(1).startWalk(null));
     }
 
     @Test
@@ -79,8 +78,7 @@ class WalkTest {
         Walk w = new Walk(1);
         LocalDateTime t = LocalDateTime.now();
         w.startWalk(t);
-        assertThrows(IllegalStateException.class,
-                () -> w.startWalk(t.plusMinutes(1)));
+        assertThrows(IllegalStateException.class, () -> w.startWalk(t.plusMinutes(1)));
     }
 
     @Test

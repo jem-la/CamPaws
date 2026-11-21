@@ -26,13 +26,11 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-/** Full app against PostgreSQL + PostGIS: seeding and the dog HTTP API. */
 @SpringBootTest
 @AutoConfigureMockMvc
 @Import(PostgisTestDatabase.class)
 @Testcontainers(disabledWithoutDocker = true)
 class CampawsApplicationTests {
-
     @Autowired
     private DogCatalog catalog;
 
